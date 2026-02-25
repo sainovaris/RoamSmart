@@ -34,20 +34,17 @@ export default function Map() {
     try {
       setLoading(true);
 
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
         setError("Location permission denied");
         return;
       }
 
-      const currentLocation =
-        await Location.getCurrentPositionAsync({});
+      const currentLocation = await Location.getCurrentPositionAsync({});
 
-      const { latitude, longitude } =
-        currentLocation.coords;
-
+      const { latitude, longitude } = currentLocation.coords;
+      console.log("Current Location:", latitude, longitude);
       setLocation(currentLocation.coords);
 
       const response = await axios.get(
@@ -72,8 +69,10 @@ export default function Map() {
           open_now: place.open_now,
           latitude: place.location.coordinates[1],
           longitude: place.location.coordinates[0],
-        }));
+        })
+      );
 
+      console.log("Fetched Places:", formattedPlaces);
       setPlaces(formattedPlaces);
 
       // 🔥 Auto-fit markers
