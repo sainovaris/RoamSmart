@@ -6,30 +6,37 @@ const openai = new OpenAI({
 
 const generatePlaceDetails = async (place) => {
   const prompt = `
-You are a luxury AI travel guide.
+  Return ONLY valid JSON. No explanation. No markdown.
 
-Generate a structured JSON response for the place below.
+    Structure:
+    {
+      "overview": "string",
+      "highlights": ["point1", "point2"],
+      "best_time_to_visit": "string",
+      "travel_tips": "string",
+      "recommended_duration": "string",
+      "booking_required": true or false
+    }
 
-Place:
-Name: ${place.name}
-Type: ${place.type}
-Rating: ${place.rating}
-Address: ${place.address}
-
-Return strictly valid JSON with this format:
-{
-  "overview": "",
-  "highlights": [],
-  "best_time_to_visit": "",
-  "travel_tips": "",
-  "recommended_duration": "",
-  "booking_required": true/false
-}
-`;
+    Place:
+    Name: ${place.name}
+    Type: ${place.type}
+    Location: ${place.location.coordinates[1]}, ${place.location.coordinates[0]}
+  `;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
+    messages: [
+      {
+        role: "system",
+        content:
+          "You must respond ONLY with valid JSON matching the schema.",
+      },
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
     temperature: 0.7,
   });
 
