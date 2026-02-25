@@ -19,9 +19,15 @@ mongoose
 
 const healthRoutes = require("./routes/healthRoutes");
 const placesRoutes = require("./routes/placesRoutes");
+const planRoutes = require("./routes/planRoutes");
+const aiRoutes = require("./routes/aiRoutes");
+
+app.use("/api/ai", aiRoutes);
+app.use("/api/plan", planRoutes);
 app.get("/", (req, res) => {
   res.send("Server is running perfectly!");
 });
+
 
 app.use("/api", healthRoutes);
 app.use("/api", placesRoutes);
