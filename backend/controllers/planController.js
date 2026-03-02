@@ -1,4 +1,5 @@
 const rankingService = require("../services/rankingService");
+const { getDistanceMeters } = require("../utils/distanceCalc");
 
 exports.generateItinerary = async (req, res) => {
   try {
@@ -43,5 +44,50 @@ exports.generateItinerary = async (req, res) => {
     res.status(200).json({ success: true, plan: itinerary });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.checkArrival = async (req, res) => {
+  try {
+    const { userLat, userLng, placeLat, placeLng } = req.body;
+
+    const distance = getDistanceMeters(userLat, userLng, placeLat, placeLng);
+
+    const arrived = distance < 100;
+
+    res.json({
+      arrived,
+      distance,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+const { reorderPlaces } = require("../services/reorderService");
+
+exports.reorderPlan = async (req, res) => {
+  try {
+    const { places, userLat, userLng } = req.body;
+
+    const sorted = reorderPlaces(places, userLat, userLng);
+
+    res.json(sorted);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+exports.recalculatePlan = async (req, res) => {
+  try {
+    const { lat, lng, hours } = req.body;
+
+    const places = await fetchNearbyFromGoogle(lat, lng, "tourist_attraction");
+
+    const topPlaces = places.slice(0, 8);
+
+    const plan = await generateItineraryAI(topPlaces, hours);
+
+    res.json(plan);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
   }
 };

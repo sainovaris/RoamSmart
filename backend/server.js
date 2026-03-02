@@ -28,6 +28,8 @@ app.get("/", (req, res) => {
   res.send("Server is running perfectly!");
 });
 
+const errorHandler = require("./middleware/errorHandler");
+app.use(errorHandler);
 
 app.use("/api", healthRoutes);
 app.use("/api", placesRoutes);
