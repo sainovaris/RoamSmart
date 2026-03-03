@@ -45,7 +45,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`-------------------------------------------`);
   console.log(`🚀 ROAMSMART BACKEND IS LIVE`);
   console.log(`📡 PORT: ${PORT}`);

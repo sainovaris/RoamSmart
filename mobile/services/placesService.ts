@@ -10,3 +10,15 @@ export const getNearbyPlaces = async (lat: number, lng: number) => {
 
   return response.data;
 };
+
+export const fetchNearbyPlaces = async (lat: number, lng: number, type?: string | null) => {
+  const response = await api.get("/nearby", {
+    params: {
+      lat,
+      lng,
+      ...(type ? { type } : {}),
+    },
+  });
+
+  return response.data;
+};
