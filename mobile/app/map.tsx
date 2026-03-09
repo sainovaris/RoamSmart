@@ -12,6 +12,7 @@ import type { LocationObjectCoords } from "expo-location";
 import { fetchNearbyPlaces } from "../services/placesService";
 import { generatePlan } from "@/services/planService";
 import { api } from "@/services/api";
+import axios from "axios";
 
 type Place = {
   id: string;
@@ -96,9 +97,9 @@ export default function Map() {
         longitude,
         selectedType === "Restaurant" ? "Restaurant" : null
       );
-      // console.log("Places API response:", response);
       
       const { results } = response;
+      console.log("Places API results:", results);
 
       let filteredResults = results;
 
@@ -110,19 +111,19 @@ export default function Map() {
 
       // console.log("Filtered places:", filteredResults);
 
-      const formatted: Place[] = filteredResults.map(
-        (place: any) => {
-          const placeLat =
-            place.location.coordinates[1];
-          const placeLng =
-            place.location.coordinates[0];
+      const formatted: Place[] = filteredResults
+        .filter((place: any) => place.location && place.location.lat && place.location.lng)
+        .map((place: any) => {
+
+          const placeLat = place.location.lat;
+          const placeLng = place.location.lng;
 
           return {
-            id: place._id,
+            id: place.place_id,
             name: place.name,
-            rating: place.rating,
-            type: place.type,
-            open_now: place.open_now,
+            rating: place.rating || 0,
+            type: place.types?.[0] || "Place",
+            open_now: place.is_open,
             latitude: placeLat,
             longitude: placeLng,
             distance: calculateDistance(
@@ -132,8 +133,7 @@ export default function Map() {
               placeLng
             ),
           };
-        }
-      );
+      });
 
       // formatted.sort((a, b) => a.distance - b.distance);
 
@@ -168,6 +168,22 @@ export default function Map() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const fetchPlaceDetails = async (placeId: string) => {
+
+    try {
+
+      const response = await axios.get(
+        `${BASE_API_URL}/place-details/${placeId}`
+      );
+
+      console.log("Place Details:", response.data);
+
+    } catch (err) {
+      console.log("Details error:", err);
+    }
+
   };
 
   const handleGeneratePlan = async () => {
@@ -288,7 +304,7 @@ export default function Map() {
               // 🔥 Prevent duplicate AI calls
               if (selectedPlace?.id !== place.id) {
                 setSelectedPlace(place);
-                fetchAIDetails(place.id);
+                fetchPlaceDetails(place.id);
               }
             }}
           />
