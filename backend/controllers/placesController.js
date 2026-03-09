@@ -1,6 +1,7 @@
 const Place = require("../models/Place");
 const googleService = require("../services/googlePlacesService");
 const rankingService = require("../services/rankingService");
+const classifyPlace = require("../utils/classifyPlace");
 
 // Inside your getNearbyAttractions function, change the last line:
 
@@ -89,29 +90,36 @@ exports.getRealNearbyPlaces = async (req, res) => {
       });
     }
 
-    const googleResults = await googleService.fetchNearbyFromGoogle(lat, lng, type);
+    const googleResults = await googleService.fetchNearbyFromGoogle(
+      lat,
+      lng,
+      type,
+    );
 
-    // 1. CLEANING DATA
-    const cleanedResults = googleResults.map((place) => ({
-      place_id: place.place_id,
-      name: place.name,
-      rating: place.rating || 0,
-      total_ratings: place.user_ratings_total || 0, // IMPORTANT: Need this for ranking!
-      address: place.vicinity,
-      types: place.types,
-      is_open: place.opening_hours ? place.opening_hours.open_now : "Unknown",
-      photo_reference: place.photos ? place.photos[0].photo_reference : null,
-      location: place.geometry.location,
-    }));
+    console.log("First Place:", googleResults[0]);
 
-    // 2. RANKING DATA (The Day 13 Change)
-    // We pass our cleaned list to the service to calculate scores and sort them
+    const cleanedResults = googleResults.map((place) => {
+      const category = classifyPlace(place.types);
+
+      return {
+        name: place.name,
+        rating: place.rating || 0,
+        total_ratings: place.total_ratings || 0,
+        address: place.address || "",
+        types: place.types || [],
+        category: category,
+        is_open: place.is_open ?? "Unknown",
+        photo: place.photo || null,
+        location: place.location,
+      };
+    });
+
     const rankedResults = rankingService.rankPlaces(cleanedResults);
 
     res.status(200).json({
       success: true,
       count: rankedResults.length,
-      results: rankedResults, // Send the sorted list to Aasutosh
+      results: rankedResults,
     });
   } catch (error) {
     res.status(500).json({

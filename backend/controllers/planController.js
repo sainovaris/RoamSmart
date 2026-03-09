@@ -1,5 +1,11 @@
 const rankingService = require("../services/rankingService");
+const googleService = require("../services/googlePlacesService");
+const classifyPlace = require("../utils/classifyPlace");
 const { getDistanceMeters } = require("../utils/distanceCalc");
+const { reorderPlaces } = require("../services/reorderService");
+const filterPlacesByWeather = require("../utils/weatherCheck");
+
+
 
 exports.generateItinerary = async (req, res) => {
   try {
@@ -7,16 +13,43 @@ exports.generateItinerary = async (req, res) => {
 
     // 1. Get the best places using your existing service
     const rawPlaces = await googleService.fetchNearbyFromGoogle(lat, lng);
-    const rankedPlaces = rankingService.rankPlaces(rawPlaces);
+
+    // CLASSIFY EACH PLACE
+   const classifiedPlaces = rawPlaces.map((place) => ({
+     name: place.name,
+     category: classifyPlace(place.types),
+
+     location: {
+       lat: place.geometry?.location?.lat,
+       lng: place.geometry?.location?.lng,
+     },
+
+     rating: place.rating || 0,
+     address: place.vicinity || "Address not available",
+   }));
+
+    // WEATHER FILTERING
+    const weather = "clear"; // later replace with real weather API
+    const filteredPlaces = filterPlacesByWeather(classifiedPlaces, weather);
+    // RANK THEM
+    const rankedPlaces = rankingService.rankPlaces(filteredPlaces);
 
     // 2. Take top 4-5 places (don't overwhelm the user)
-    const selectedPlaces = rankedPlaces.slice(0, 5);
+    const nature = rankedPlaces.filter((p) => p.category === "Nature");
+    const culture = rankedPlaces.filter((p) => p.category === "Culture");
+    const food = rankedPlaces.filter((p) => p.category === "Food");
 
+    const selectedPlaces = [
+      ...nature.slice(0, 2),
+      ...culture.slice(0, 2),
+      ...food.slice(0, 1),
+    ];
+    const optimizedPlaces = reorderPlaces(selectedPlaces, lat, lng);
     // 3. Simple Time Allocation Logic
     let currentTime = new Date();
     currentTime.setHours(10, 0, 0); // Start the tour at 10:00 AM
 
-    const itinerary = selectedPlaces.map((place, index) => {
+    const itinerary = optimizedPlaces.map((place, index) => {
       const startTime = currentTime.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -35,6 +68,7 @@ exports.generateItinerary = async (req, res) => {
       return {
         step: index + 1,
         name: place.name,
+        category: place.category,
         location: place.location,
         visit_time: `${startTime} - ${endTime}`,
         address: place.address,
@@ -63,7 +97,7 @@ exports.checkArrival = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-const { reorderPlaces } = require("../services/reorderService");
+
 
 exports.reorderPlan = async (req, res) => {
   try {
@@ -80,7 +114,11 @@ exports.recalculatePlan = async (req, res) => {
   try {
     const { lat, lng, hours } = req.body;
 
-    const places = await fetchNearbyFromGoogle(lat, lng, "tourist_attraction");
+    const places = await googleService.fetchNearbyFromGoogle(
+      lat,
+      lng,
+      "tourist_attraction",
+    );
 
     const topPlaces = places.slice(0, 8);
 

@@ -1,29 +1,33 @@
 /**
- * Ranks places based on rating, popularity (number of reviews), and status
+ * Advanced ranking based on rating, popularity confidence, and user preference
  */
-exports.rankPlaces = (places) => {
+
+exports.rankPlaces = (places, userPreferences = []) => {
+  // Find the maximum number of reviews among all places
+  const Nmax = Math.max(...places.map((p) => p.total_ratings || 0), 1);
+
   return (
     places
       .map((place) => {
-        // Basic Math: 70% weight to Rating, 30% weight to quantity of reviews
-        // We use Math.log10 to prevent a place with 10,000 reviews from
-        // completely destroying a place with 500 reviews.
-        const popularityScore = Math.log10(place.total_ratings + 1) * 0.3;
-        const ratingScore = place.rating * 0.7;
+        const R = place.rating || 0;
+        const N = place.total_ratings || 0;
 
-        let finalScore = ratingScore + popularityScore;
+        // Confidence score
+        const confidence = Math.log(N + 1) / Math.log(Nmax + 1);
 
-        // Penalty: If it's closed, drop the score significantly
-        if (place.is_open === false) {
-          finalScore -= 3;
-        }
+        // Preference boost
+        const P = userPreferences.includes(place.category) ? 1 : 0;
+
+        // Final score
+        const finalScore = R * confidence * (1 + P);
 
         return {
           ...place,
           relevance_score: parseFloat(finalScore.toFixed(2)),
         };
       })
-      // Sort from highest score to lowest
+
+      // Sort descending
       .sort((a, b) => b.relevance_score - a.relevance_score)
   );
 };
