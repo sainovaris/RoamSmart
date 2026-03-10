@@ -2,21 +2,14 @@ const rankingService = require("../services/rankingService");
 const googleService = require("../services/googlePlacesService");
 const classifyPlace = require("../utils/classifyPlace");
 const { getDistanceMeters } = require("../utils/distanceCalc");
-<<<<<<< HEAD
-const googleService = require("../services/googlePlacesService");
-const { fetchNearbyFromGoogle } = require("../services/googlePlacesService");
-const { generateItineraryAI } = require("../services/openaiService");
-=======
 const { reorderPlaces } = require("../services/reorderService");
 const filterPlacesByWeather = require("../utils/weatherCheck");
->>>>>>> 6b2e4c5bdb33d7b635ec9ac9a945a726a33930ae
 
 // --------------------------- GENERATE ITINERARY ---------------------------
 exports.generateItinerary = async (req, res) => {
   try {
     const { lat, lng, totalTimeHours = 6, category } = req.body;
 
-<<<<<<< HEAD
     if (!lat || !lng) {
       return res.status(400).json({
         success: false,
@@ -25,9 +18,7 @@ exports.generateItinerary = async (req, res) => {
     }
     
     // 1. Get the best places using your existing service
-=======
     // 1️⃣ Fetch nearby places from Google
->>>>>>> 6b2e4c5bdb33d7b635ec9ac9a945a726a33930ae
     const rawPlaces = await googleService.fetchNearbyFromGoogle(lat, lng);
     // 🔹 Add this log to check actual Google data
     console.log(
