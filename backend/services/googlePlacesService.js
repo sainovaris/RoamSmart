@@ -13,7 +13,7 @@ exports.fetchNearbyFromGoogle = async (lat, lng, type, radius = 5000) => {
     const places = response.data.results.map((place) => ({
       name: place.name,
       rating: place.rating || 0,
-      total_ratings: place.user_ratings_total || 0,
+      user_ratings_total: place.user_ratings_total || 0,
       types: place.types || [],
 
       is_open: place.opening_hours ? place.opening_hours.open_now : true,

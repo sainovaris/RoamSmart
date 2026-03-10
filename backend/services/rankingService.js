@@ -1,33 +1,33 @@
-/**
- * Advanced ranking based on rating, popularity confidence, and user preference
- */
-
 exports.rankPlaces = (places, userPreferences = []) => {
-  // Find the maximum number of reviews among all places
+  console.log("Ranking function called!");
+  console.log("User preferences:", userPreferences);
+  console.log(
+    "Places before ranking:",
+    places.map((p) => p.name),
+  );
+
   const Nmax = Math.max(...places.map((p) => p.total_ratings || 0), 1);
 
-  return (
-    places
-      .map((place) => {
-        const R = place.rating || 0;
-        const N = place.total_ratings || 0;
+  const ranked = places
+    .map((place) => {
+      const R = place.rating || 0;
+      const N = place.total_ratings || 1;
+      const confidence = Math.log(N + 1) / Math.log(Nmax + 1);
+      const P = userPreferences.includes(place.category) ? 1 : 0;
+      const finalScore = R * confidence * (1 + P);
 
-        // Confidence score
-        const confidence = Math.log(N + 1) / Math.log(Nmax + 1);
+      console.log(`${place.name} => score: ${finalScore.toFixed(2)}`);
 
-        // Preference boost
-        const P = userPreferences.includes(place.category) ? 1 : 0;
+      return {
+        ...place,
+        relevance_score: parseFloat(finalScore.toFixed(2)),
+      };
+    })
+    .sort((a, b) => b.relevance_score - a.relevance_score);
 
-        // Final score
-        const finalScore = R * confidence * (1 + P);
-
-        return {
-          ...place,
-          relevance_score: parseFloat(finalScore.toFixed(2)),
-        };
-      })
-
-      // Sort descending
-      .sort((a, b) => b.relevance_score - a.relevance_score)
+  console.log(
+    "Ranked places:",
+    ranked.map((p) => `${p.name} (${p.relevance_score})`),
   );
+  return ranked;
 };

@@ -3,11 +3,7 @@ const googleService = require("../services/googlePlacesService");
 const rankingService = require("../services/rankingService");
 const classifyPlace = require("../utils/classifyPlace");
 
-// Inside your getNearbyAttractions function, change the last line:
-
-
-// @desc    Get all manual places from our MongoDB
-// @route   GET /api/places
+// --------------------------- GET ALL MANUAL PLACES ---------------------------
 exports.getAllPlaces = async (req, res) => {
   try {
     const places = await Place.find();
@@ -25,8 +21,7 @@ exports.getAllPlaces = async (req, res) => {
   }
 };
 
-// @desc    Get places nearby from MongoDB (Manual Data)
-// @route   GET /api/nearby
+// --------------------------- GET NEARBY MANUAL PLACES ---------------------------
 exports.getNearbyPlaces = async (req, res) => {
   try {
     const { lat, lng, type } = req.query;
@@ -75,13 +70,10 @@ exports.getNearbyPlaces = async (req, res) => {
   }
 };
 
-// @desc    Get REAL places from Google API (Week 2 Core)
-// @route   GET /api/google-nearby
-// @desc    Get REAL places from Google API + RANKED (Week 2 Core)
-// @route   GET /api/google-nearby
+// --------------------------- GET REAL GOOGLE NEARBY PLACES ---------------------------
 exports.getRealNearbyPlaces = async (req, res) => {
   try {
-    const { lat, lng, type } = req.query;
+    const { lat, lng, type, category } = req.query;
 
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({
@@ -90,31 +82,60 @@ exports.getRealNearbyPlaces = async (req, res) => {
       });
     }
 
+    // Fetch from Google
     const googleResults = await googleService.fetchNearbyFromGoogle(
-      lat,
-      lng,
+      parseFloat(lat),
+      parseFloat(lng),
       type,
     );
+    console.log(
+      googleResults.map((p) => ({
+        name: p.name,
+        user_ratings_total: p.user_ratings_total,
+        rating: p.rating,
+      })),
+    );
 
-    console.log("First Place:", googleResults[0]);
+    console.log("First Place from Google:", googleResults[0]);
 
+    // Map and classify
     const cleanedResults = googleResults.map((place) => {
-      const category = classifyPlace(place.types);
+      const categoryName = classifyPlace(place.types);
 
       return {
         name: place.name,
         rating: place.rating || 0,
-        total_ratings: place.total_ratings || 0,
-        address: place.address || "",
+        total_ratings: place.user_ratings_total || 1, // <- important fix
+        address: place.vicinity || "",
         types: place.types || [],
-        category: category,
-        is_open: place.is_open ?? "Unknown",
-        photo: place.photo || null,
-        location: place.location,
+        category: categoryName,
+        is_open: place.opening_hours?.open_now ?? "Unknown",
+        photo: place.photos ? place.photos[0]?.photo_reference : null,
+        location: place.geometry?.location || null,
       };
     });
 
-    const rankedResults = rankingService.rankPlaces(cleanedResults);
+    console.log(
+      "Classified Places with ratings:",
+      cleanedResults.map((p) => ({
+        name: p.name,
+        rating: p.rating,
+        total_ratings: p.total_ratings,
+        category: p.category,
+      })),
+    );
+
+    // Filter by user-selected category if any
+    const categoryFiltered =
+      category && category !== ""
+        ? cleanedResults.filter((p) => p.category === category)
+        : cleanedResults;
+
+    // Rank
+    const rankedResults = rankingService.rankPlaces(
+      categoryFiltered,
+      category ? [category] : [],
+    );
 
     res.status(200).json({
       success: true,
@@ -122,6 +143,7 @@ exports.getRealNearbyPlaces = async (req, res) => {
       results: rankedResults,
     });
   } catch (error) {
+    console.error("Google Nearby Error:", error);
     res.status(500).json({
       success: false,
       message: "Google API or Ranking issues",
@@ -130,8 +152,7 @@ exports.getRealNearbyPlaces = async (req, res) => {
   }
 };
 
-// @desc    Get Deep Details for a specific place
-// @route   GET /api/place-details/:placeId
+// --------------------------- GET PLACE DETAILS ---------------------------
 exports.getPlaceDetails = async (req, res) => {
   try {
     const { placeId } = req.params;
@@ -143,7 +164,7 @@ exports.getPlaceDetails = async (req, res) => {
         .json({ success: false, message: "Place not found" });
     }
 
-    // Generate Direct Photo URL if available (Day 4 Task)
+    // Generate main photo URL if available
     if (details.photos && details.photos.length > 0) {
       details.main_photo_url = googleService.getPhotoUrl(
         details.photos[0].photo_reference,
@@ -155,6 +176,7 @@ exports.getPlaceDetails = async (req, res) => {
       results: details,
     });
   } catch (error) {
+    console.error("Place Details Error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch place details",
