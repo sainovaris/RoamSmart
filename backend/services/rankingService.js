@@ -1,33 +1,29 @@
-exports.rankPlaces = (places, userPreferences = []) => {
-  console.log("Ranking function called!");
-  console.log("User preferences:", userPreferences);
-  console.log(
-    "Places before ranking:",
-    places.map((p) => p.name),
+/**
+ * Ranks places based on rating, popularity (number of reviews), and status
+ */
+exports.rankPlaces = (places) => {
+  return (
+    places
+      .map((place) => {
+        // Basic Math: 70% weight to Rating, 30% weight to quantity of reviews
+        // We use Math.log10 to prevent a place with 10,000 reviews from
+        // completely destroying a place with 500 reviews.
+        const popularityScore = Math.log10(place.total_ratings + 1) * 0.3;
+        const ratingScore = place.rating * 0.7;
+
+        let finalScore = ratingScore + popularityScore;
+
+        // Penalty: If it's closed, drop the score significantly
+        if (place.is_open === false) {
+          finalScore -= 3;
+        }
+
+        return {
+          ...place,
+          relevance_score: parseFloat(finalScore.toFixed(2)),
+        };
+      })
+      // Sort from highest score to lowest
+      .sort((a, b) => b.relevance_score - a.relevance_score)
   );
-
-  const Nmax = Math.max(...places.map((p) => p.total_ratings || 0), 1);
-
-  const ranked = places
-    .map((place) => {
-      const R = place.rating || 0;
-      const N = place.total_ratings || 1;
-      const confidence = Math.log(N + 1) / Math.log(Nmax + 1);
-      const P = userPreferences.includes(place.category) ? 1 : 0;
-      const finalScore = R * confidence * (1 + P);
-
-      console.log(`${place.name} => score: ${finalScore.toFixed(2)}`);
-
-      return {
-        ...place,
-        relevance_score: parseFloat(finalScore.toFixed(2)),
-      };
-    })
-    .sort((a, b) => b.relevance_score - a.relevance_score);
-
-  console.log(
-    "Ranked places:",
-    ranked.map((p) => `${p.name} (${p.relevance_score})`),
-  );
-  return ranked;
 };

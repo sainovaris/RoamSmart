@@ -10,7 +10,9 @@ import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import type { LocationObjectCoords } from "expo-location";
 import { fetchNearbyPlaces } from "../services/placesService";
+import { generatePlan } from "@/services/planService";
 import { api } from "@/services/api";
+import axios from "axios";
 
 type Place = {
   id: string;
@@ -67,6 +69,9 @@ export default function Map() {
   const [aiDetails, setAiDetails] = useState<AIDetails | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  const [itinerary, setItinerary] = useState<any[]>([]);
+  const [planLoading, setPlanLoading] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,24 +95,35 @@ export default function Map() {
       const response = await fetchNearbyPlaces(
         latitude,
         longitude,
-        selectedType
+        selectedType === "Restaurant" ? "Restaurant" : null
       );
-
+      
       const { results } = response;
+      console.log("Places API results:", results);
 
-      const formatted: Place[] = results.map(
-        (place: any) => {
-          const placeLat =
-            place.location.coordinates[1];
-          const placeLng =
-            place.location.coordinates[0];
+      let filteredResults = results;
+
+      if (selectedType === null) {
+        filteredResults = results.filter(
+          (place: any) => place.type !== "Restaurant"
+        );
+      }
+
+      // console.log("Filtered places:", filteredResults);
+
+      const formatted: Place[] = filteredResults
+        .filter((place: any) => place.location && place.location.lat && place.location.lng)
+        .map((place: any) => {
+
+          const placeLat = place.location.lat;
+          const placeLng = place.location.lng;
 
           return {
-            id: place._id,
+            id: place.place_id,
             name: place.name,
-            rating: place.rating,
-            type: place.type,
-            open_now: place.open_now,
+            rating: place.rating || 0,
+            type: place.types?.[0] || "Place",
+            open_now: place.is_open,
             latitude: placeLat,
             longitude: placeLng,
             distance: calculateDistance(
@@ -117,8 +133,9 @@ export default function Map() {
               placeLng
             ),
           };
-        }
-      );
+      });
+
+      // formatted.sort((a, b) => a.distance - b.distance);
 
       setPlaces(formatted);
     } catch (err: any) {
@@ -141,6 +158,7 @@ export default function Map() {
       console.log("AI URL:", `${BASE_API_URL}/ai/${placeId}`);
 
       const response = await api.get(`/ai/${placeId}`);
+      // console.log("AI response:", response.data);
 
       if (response.data.success) {
         setAiDetails(response.data.data);
@@ -149,6 +167,45 @@ export default function Map() {
       console.log("AI error:", error);
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const fetchPlaceDetails = async (placeId: string) => {
+
+    try {
+
+      const response = await axios.get(
+        `${BASE_API_URL}/place-details/${placeId}`
+      );
+
+      console.log("Place Details:", response.data);
+
+    } catch (err) {
+      console.log("Details error:", err);
+    }
+
+  };
+
+  const handleGeneratePlan = async () => {
+    if (!location) return;
+
+    try {
+      setPlanLoading(true);
+
+      const response = await generatePlan(
+        location.latitude,
+        location.longitude,
+        3 // hours
+      );
+
+      if (response.success) {
+        setItinerary(response.plan);
+      }
+
+    } catch (error) {
+      console.log("Plan error:", error);
+    } finally {
+      setPlanLoading(false);
     }
   };
 
@@ -172,7 +229,8 @@ export default function Map() {
 
   return (
     <View className="flex-1">
-      <View className="absolute top-16 left-5 right-5 flex-row justify-between bg-white rounded-xl p-2 shadow-md z-50">
+      { /*🔥 Filter Buttons */ }
+      <View className="absolute top-4 left-5 right-5 flex-row justify-between bg-white rounded-xl p-2 shadow-md z-50">
         <Pressable
           onPress={() => setSelectedType(null)}
           className={`flex-1 py-2 rounded-lg ${
@@ -200,7 +258,24 @@ export default function Map() {
         </Pressable>
       </View>
 
+      { /*🔥 Plan Button */ }
+      <View className="absolute top-20 left-5 right-5 z-50">
+        <Pressable
+          onPress={handleGeneratePlan}
+          className="bg-blue-600 py-3 rounded-xl shadow-md"
+        >
+          {planLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-white text-center font-semibold">
+              🧠 Plan My Trip
+            </Text>
+          )}
+        </Pressable>
+      </View>
+      
 
+      { /* Map */ }
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
@@ -220,16 +295,88 @@ export default function Map() {
               longitude: place.longitude,
             }}
             title={place.name}
+             pinColor={
+              place.type === "Restaurant"
+                ? "orange"
+                : "red"
+            }
             onPress={() => {
               // 🔥 Prevent duplicate AI calls
               if (selectedPlace?.id !== place.id) {
                 setSelectedPlace(place);
-                fetchAIDetails(place.id);
+                fetchPlaceDetails(place.id);
               }
             }}
           />
         ))}
       </MapView>
+
+      {itinerary.length > 0 && (
+        <View className="absolute top-20 left-5 right-5 bg-white p-4 rounded-xl shadow-lg">
+          <Text className="text-lg font-bold mb-2">
+            AI Travel Plan
+          </Text>
+
+          {itinerary.map((place, index) => (
+            <Text key={index} className="text-gray-700 mb-1">
+              {index + 1}. {place.name} {place.visit_time}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      {/* 🔥 Horizontal Scroll */}
+      <View className="absolute bottom-5 left-0 right-0 pb-2">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="px-3"
+        >
+          {places.map((place) => (
+            <Pressable
+              key={place.id}
+              className="bg-white rounded-xl shadow-md mr-3 p-3 w-56"
+              onPress={() => {
+                setSelectedPlace(place);
+
+                mapRef.current?.animateToRegion(
+                  {
+                    latitude: place.latitude,
+                    longitude: place.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  },
+                  500
+                );
+
+                fetchAIDetails(place.id);
+              }}
+            >
+              <Text className="font-semibold text-lg">
+                {place.name}
+              </Text>
+
+              <Text className="text-gray-500 mt-1">
+                ⭐ {place.rating} • {place.type}
+              </Text>
+
+              <Text className="text-gray-400 mt-1">
+                📍 {place.distance} km away
+              </Text>
+
+              <Text
+                className={`mt-1 font-medium ${
+                  place.open_now
+                    ? "text-green-600"
+                    : "text-red-500"
+                }`}
+              >
+                {place.open_now ? "Open Now" : "Closed"}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* No places */}
       {places.length === 0 && (
@@ -242,10 +389,10 @@ export default function Map() {
 
       {/* 🔥 Bottom Card */}
       {selectedPlace && (
-        <View className="absolute bottom-6 left-5 right-5 bg-white p-4 rounded-2xl shadow-xl max-h-[65%]">
+        <View className="absolute bottom-52 left-5 right-5 bg-white p-4 rounded-2xl shadow-xl max-h-[65%]">
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text className="text-gray-500 mt-1">
-              ⭐ {selectedPlace.rating} • {selectedPlace.type}
+              {selectedPlace.type === "Restaurant" ? "🍽" : "📍"} ⭐ {selectedPlace.rating} • {selectedPlace.type}
             </Text>
 
             <Text className="text-gray-400 mt-1">

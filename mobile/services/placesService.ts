@@ -11,13 +11,18 @@ export const getNearbyPlaces = async (lat: number, lng: number) => {
   return response.data;
 };
 
-export const fetchNearbyPlaces = async (lat: number, lng: number, type?: string | null) => {
-  const response = await api.get("/nearby", {
+export const fetchNearbyPlaces = async (
+  lat: number,
+  lng: number,
+  type?: string | null
+) => {
+
+  const response = await api.get("/google-nearby", {
     params: {
       lat,
       lng,
-      ...(type ? { type } : {}),
-    },
+      ...(type ? { type } : {})
+    }
   });
 
   return response.data;

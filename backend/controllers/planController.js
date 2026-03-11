@@ -10,6 +10,14 @@ exports.generateItinerary = async (req, res) => {
   try {
     const { lat, lng, totalTimeHours = 6, category } = req.body;
 
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing coordinates"
+      });
+    }
+    
+    // 1. Get the best places using your existing service
     // 1️⃣ Fetch nearby places from Google
     const rawPlaces = await googleService.fetchNearbyFromGoogle(lat, lng);
     // 🔹 Add this log to check actual Google data

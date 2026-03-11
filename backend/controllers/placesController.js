@@ -54,11 +54,13 @@ exports.getNearbyPlaces = async (req, res) => {
 
     const places = await Place.find(query);
 
+    const rankedPlaces = rankingService.rankPlaces(places);
+
     res.status(200).json({
       success: true,
       user_coords: { lat: latitude, lng: longitude },
-      count: places.length,
-      results: places,
+      count: rankedPlaces.length,
+      results: rankedPlaces,
     });
   } catch (error) {
     console.error("Nearby Search Error:", error);

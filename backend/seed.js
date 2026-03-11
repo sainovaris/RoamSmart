@@ -45,6 +45,30 @@ const rajkotPlaces = [
     location: { type: "Point", coordinates: [70.8356, 22.2688] },
     address: "Aji River, Rajkot, Gujarat",
   },
+  {
+    name: "Mayur Bhajiya",
+    type: "Restaurant",
+    rating: 4.2,
+    open_now: true,
+    location: { type: "Point", coordinates: [70.7994824438956, 22.284510674958103] },
+    address: "Gondal Road, Rajkot, Gujarat",
+  },
+  {
+    name: "Suryakant Hotel",
+    type: "Restaurant",
+    rating: 3.9,
+    open_now: true,
+    location: { type: "Point", coordinates: [70.80006797144043, 22.288761204548507] },
+    address: "Gondal Road, Rajkot, Gujarat",
+  },
+  {
+    name: "Shree Chinese & Punjabi Food",
+    type: "Restaurant",
+    rating: 3.7,
+    open_now: true,
+    location: { type: "Point", coordinates: [70.79560931427517, 22.290546404792522] },
+    address: "Yagnik Road, Rajkot, Gujarat",
+  },
 ];
 
 const seedDB = async () => {
