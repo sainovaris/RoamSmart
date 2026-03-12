@@ -15,6 +15,12 @@ const aiDetailsSchema = new mongoose.Schema(
 
 const placeSchema = new mongoose.Schema(
   {
+    place_id: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
     name: { type: String, required: true },
     type: { type: String, required: true },
     rating: { type: Number, min: 0, max: 5 },

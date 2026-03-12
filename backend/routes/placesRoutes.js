@@ -9,4 +9,6 @@ router.get("/nearby", placesController.getNearbyPlaces);
 
 router.get("/google-nearby", placesController.getRealNearbyPlaces);
 
+router.get("/place-details/:placeId", placesController.getPlaceDetails);
+
 module.exports = router;

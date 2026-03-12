@@ -11,6 +11,7 @@ exports.fetchNearbyFromGoogle = async (lat, lng, type, radius = 5000) => {
     console.log("Google API Status:", response.data.status);
 
     const places = response.data.results.map((place) => ({
+      place_id: place.place_id,
       name: place.name,
       rating: place.rating || 0,
       user_ratings_total: place.user_ratings_total || 0,
@@ -51,12 +52,6 @@ exports.getPlaceDetailsFromGoogle = async (placeId) => {
     if (response.data.status !== "OK") {
       return null;
     }
-    console.log(
-      places.map((p) => ({
-        name: p.name,
-        types: p.types,
-      })),
-    );
 
     return response.data.result;
   } catch (error) {

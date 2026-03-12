@@ -103,7 +103,6 @@ exports.getRealNearbyPlaces = async (req, res) => {
       });
     }
 
-
     // Fetch from Google
     const googleResults = await googleService.fetchNearbyFromGoogle(
       latitude,
@@ -127,7 +126,7 @@ exports.getRealNearbyPlaces = async (req, res) => {
       const lng = place.location?.lng;
 
       return {
-        place_id: `${place.name}-${index}`, 
+        place_id: place.place_id,
         name: place.name,
         rating: place.rating || 0,
         total_ratings: place.user_ratings_total || 0,
