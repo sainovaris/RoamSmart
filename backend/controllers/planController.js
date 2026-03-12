@@ -21,6 +21,8 @@ exports.generateItinerary = async (req, res) => {
     // 1️⃣ Fetch nearby places from Google
     const rawPlaces = await googleService.fetchNearbyFromGoogle(lat, lng);
     // 🔹 Add this log to check actual Google data
+    console.log("Raw Places from Google:", rawPlaces.length);
+    console.log(rawPlaces.slice(0, 5));
     console.log(
       rawPlaces.map((p) => ({
         name: p.name,
@@ -33,13 +35,10 @@ exports.generateItinerary = async (req, res) => {
     const classifiedPlaces = rawPlaces.map((place) => ({
       name: place.name,
       category: classifyPlace(place.types),
-      location: {
-        lat: place.geometry?.location?.lat,
-        lng: place.geometry?.location?.lng,
-      },
+      location: place.location, // ✔ correct field
       rating: place.rating || 0,
       total_ratings: place.user_ratings_total || 1,
-      address: place.vicinity || "Address not available",
+      address: place.address || "Address not available", // ✔ correct field
     }));
 
     console.log(
@@ -71,7 +70,6 @@ exports.generateItinerary = async (req, res) => {
     // 6️⃣ Select top places
     let selectedPlaces;
     if (!category || category === "") {
-      // Default: pick 2 Nature, 2 Culture, 1 Food
       const nature = rankedPlaces.filter((p) => p.category === "Nature");
       const culture = rankedPlaces.filter((p) => p.category === "Culture");
       const food = rankedPlaces.filter((p) => p.category === "Food");
@@ -81,8 +79,12 @@ exports.generateItinerary = async (req, res) => {
         ...culture.slice(0, 2),
         ...food.slice(0, 1),
       ];
+
+      // 🔹 fallback if categories not found
+      if (selectedPlaces.length === 0) {
+        selectedPlaces = rankedPlaces.slice(0, 5);
+      }
     } else {
-      // Only user-selected category: take top 5
       selectedPlaces = rankedPlaces.slice(0, 5);
     }
 

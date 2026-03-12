@@ -51,6 +51,12 @@ exports.getPlaceDetailsFromGoogle = async (placeId) => {
     if (response.data.status !== "OK") {
       return null;
     }
+    console.log(
+      places.map((p) => ({
+        name: p.name,
+        types: p.types,
+      })),
+    );
 
     return response.data.result;
   } catch (error) {
