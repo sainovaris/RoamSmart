@@ -11,5 +11,6 @@ export const generatePlan = async (
     duration,
   });
 
+  console.log("Plan generation response:", response.data);
   return response.data;
 };

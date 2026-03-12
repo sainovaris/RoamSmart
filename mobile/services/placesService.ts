@@ -8,22 +8,24 @@ export const getNearbyPlaces = async (lat: number, lng: number) => {
     },
   });
 
+  console.log("Nearby places response:", response.data);
   return response.data;
 };
 
 export const fetchNearbyPlaces = async (
   lat: number,
   lng: number,
-  type?: string | null
+  category?: string
 ) => {
 
   const response = await api.get("/google-nearby", {
     params: {
       lat,
       lng,
-      ...(type ? { type } : {})
+      ...(category && category !== "All" && { category })
     }
   });
 
+  console.log("Google Nearby places response:", response.data);
   return response.data;
 };
