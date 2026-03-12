@@ -3,16 +3,21 @@ const googleService = require("../services/googlePlacesService");
 const rankingService = require("../services/rankingService");
 const classifyPlace = require("../utils/classifyPlace");
 
+
 // --------------------------- GET ALL MANUAL PLACES ---------------------------
 exports.getAllPlaces = async (req, res) => {
   try {
     const places = await Place.find();
+
     res.status(200).json({
-      count: places.length,
       success: true,
+      count: places.length,
       results: places,
     });
+
   } catch (error) {
+    console.error("Error fetching manual places:", error);
+
     res.status(500).json({
       success: false,
       message: "Error fetching all places",
@@ -20,6 +25,7 @@ exports.getAllPlaces = async (req, res) => {
     });
   }
 };
+
 
 // --------------------------- GET NEARBY MANUAL PLACES ---------------------------
 exports.getNearbyPlaces = async (req, res) => {
@@ -29,14 +35,21 @@ exports.getNearbyPlaces = async (req, res) => {
     if (!lat || !lng) {
       return res.status(400).json({
         success: false,
-        message: "Please provide both latitude (lat) and longitude (lng)",
+        message: "Latitude and Longitude are required",
       });
     }
 
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
 
-    let query = {
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and Longitude must be valid numbers",
+      });
+    }
+
+    const query = {
       location: {
         $near: {
           $geometry: {
@@ -62,8 +75,10 @@ exports.getNearbyPlaces = async (req, res) => {
       count: rankedPlaces.length,
       results: rankedPlaces,
     });
+
   } catch (error) {
-    console.error("Nearby Search Error:", error);
+    console.error("Nearby Mongo Search Error:", error);
+
     res.status(500).json({
       success: false,
       message: "Error calculating nearby places",
@@ -72,80 +87,88 @@ exports.getNearbyPlaces = async (req, res) => {
   }
 };
 
+
 // --------------------------- GET REAL GOOGLE NEARBY PLACES ---------------------------
 exports.getRealNearbyPlaces = async (req, res) => {
   try {
-    const { lat, lng, type, category } = req.query;
+    const { lat, lng, category } = req.query;
 
-    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+
+    if (!latitude || !longitude) {
       return res.status(400).json({
         success: false,
-        message: "Latitude and Longitude must be valid numbers.",
+        message: "Latitude and Longitude must be valid numbers",
       });
     }
 
+
     // Fetch from Google
     const googleResults = await googleService.fetchNearbyFromGoogle(
-      parseFloat(lat),
-      parseFloat(lng),
-      type,
-    );
-    console.log(
-      googleResults.map((p) => ({
-        name: p.name,
-        user_ratings_total: p.user_ratings_total,
-        rating: p.rating,
-      })),
+      latitude,
+      longitude
     );
 
-    console.log("First Place from Google:", googleResults[0]);
+    console.log("Google results count:", googleResults.length);
 
-    // Map and classify
-    const cleanedResults = googleResults.map((place) => {
-      const categoryName = classifyPlace(place.types);
+    if (!googleResults || googleResults.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        results: [],
+      });
+    }
+
+    // Clean + classify
+    const cleanedResults = googleResults.map((place, index) => {
+
+      const lat = place.location?.lat;
+      const lng = place.location?.lng;
 
       return {
+        place_id: `${place.name}-${index}`, 
         name: place.name,
         rating: place.rating || 0,
-        total_ratings: place.user_ratings_total || 1, // <- important fix
-        address: place.vicinity || "",
+        total_ratings: place.user_ratings_total || 0,
+        address: place.address || "",
         types: place.types || [],
-        category: categoryName,
-        is_open: place.opening_hours?.open_now ?? "Unknown",
-        photo: place.photos ? place.photos[0]?.photo_reference : null,
-        location: place.geometry?.location || null,
+        category: classifyPlace(place.types),
+        location: {
+          lat,
+          lng,
+        },
+        is_open: place.is_open ?? "Unknown",
+        photo: place.photo || null,
       };
     });
 
     console.log(
-      "Classified Places with ratings:",
-      cleanedResults.map((p) => ({
-        name: p.name,
-        rating: p.rating,
-        total_ratings: p.total_ratings,
-        category: p.category,
-      })),
+      "Cleaned places sample:",
+      cleanedResults.slice(0, 2)
     );
 
-    // Filter by user-selected category if any
+    // Category filter
     const categoryFiltered =
-      category && category !== ""
+      category && category !== "All"
         ? cleanedResults.filter((p) => p.category === category)
         : cleanedResults;
 
-    // Rank
-    const rankedResults = rankingService.rankPlaces(
-      categoryFiltered,
-      category ? [category] : [],
-    );
+        
+    // Ranking
+    const rankedResults = rankingService.rankPlaces(categoryFiltered);
+
+    console.log("Ranked places:", rankedResults.length);
 
     res.status(200).json({
       success: true,
       count: rankedResults.length,
       results: rankedResults,
     });
+
   } catch (error) {
     console.error("Google Nearby Error:", error);
+
     res.status(500).json({
       success: false,
       message: "Google API or Ranking issues",
@@ -154,22 +177,24 @@ exports.getRealNearbyPlaces = async (req, res) => {
   }
 };
 
+
 // --------------------------- GET PLACE DETAILS ---------------------------
 exports.getPlaceDetails = async (req, res) => {
   try {
     const { placeId } = req.params;
+
     const details = await googleService.getPlaceDetailsFromGoogle(placeId);
 
     if (!details) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Place not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Place not found",
+      });
     }
 
-    // Generate main photo URL if available
-    if (details.photos && details.photos.length > 0) {
+    if (details.photos?.length) {
       details.main_photo_url = googleService.getPhotoUrl(
-        details.photos[0].photo_reference,
+        details.photos[0].photo_reference
       );
     }
 
@@ -177,8 +202,10 @@ exports.getPlaceDetails = async (req, res) => {
       success: true,
       results: details,
     });
+
   } catch (error) {
     console.error("Place Details Error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch place details",
