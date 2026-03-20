@@ -1,47 +1,51 @@
 const mongoose = require("mongoose");
 
-const aiDetailsSchema = new mongoose.Schema(
-  {
-    overview: String,
-    highlights: [String],
-    best_time_to_visit: String,
-    travel_tips: String,
-    recommended_duration: String,
-    booking_required: Boolean,
-    generated_at: Date,
+const placeSchema = new mongoose.Schema({
+  place_id: {
+    type: String,
+    unique: true,
+    sparse: true, // 🔥 VERY IMPORTANT
   },
-  { _id: false }, // prevents nested _id
-);
+  name: String,
+  rating: Number,
+  total_ratings: Number,
+  address: String,
+  types: [String],
+  category: String,
+  subcategory: String,
+  is_open: String,
+  photo: String,
 
-const placeSchema = new mongoose.Schema(
-  {
-    place_id: {
+  location: {
+    type: {
       type: String,
+      enum: ["Point"],
+      default: "Point",
+    },
+    coordinates: {
+      type: [Number], // [lng, lat]
       required: true,
-      unique: true,
-      index: true,
     },
-    name: { type: String, required: true },
-    type: { type: String, required: true },
-    rating: { type: Number, min: 0, max: 5 },
-    open_now: { type: Boolean, default: true },
-    address: String,
-
-    location: {
-      type: { type: String, default: "Point" },
-      coordinates: {
-        type: [Number],
-        required: true,
-      },
-    },
-
-    // 🔥 NEW AI CACHE FIELD
-    ai_details: aiDetailsSchema,
   },
-  { timestamps: true },
-);
 
-// Keep geo index
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  summary: {
+    type: String,
+  },
+
+  description: {
+    type: String,
+  },
+
+  history: {
+    type: String,
+  },
+});
+
+// Required for geo search
 placeSchema.index({ location: "2dsphere" });
 
 module.exports = mongoose.model("Place", placeSchema);

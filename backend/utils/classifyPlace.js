@@ -1,25 +1,56 @@
-module.exports = function classifyPlace(types = []) {
-  if (types.includes("park") || types.includes("natural_feature"))
-    return "Nature";
+const categoryMap = {
+  Culture: {
+    Monument: ["tourist_attraction", "monument", "historical_landmark"],
+    Museum: ["museum"],
+    Temple: ["hindu_temple", "place_of_worship"],
+    Church: ["church"],
+    Mosque: ["mosque"],
+  },
 
-  if (
-    types.includes("museum") ||
-    types.includes("church") ||
-    types.includes("hindu_temple") ||
-    types.includes("mosque") ||
-    types.includes("tourist_attraction")
-  )
-    return "Culture";
+  Food: {
+    Restaurant: ["restaurant"],
+    Cafe: ["cafe"],
+    StreetFood: ["food", "meal_takeaway"],
+    Bakery: ["bakery"],
+  },
 
-  if (
-    types.includes("restaurant") ||
-    types.includes("cafe") ||
-    types.includes("food")
-  )
-    return "Food";
+  Nature: {
+    Park: ["park"],
+    Garden: ["garden"],
+    Lake: ["lake"],
+    Beach: ["beach"],
+  },
 
-  if (types.includes("shopping_mall") || types.includes("store"))
-    return "Shopping";
+  Entertainment: {
+    Mall: ["shopping_mall"],
+    Movie: ["movie_theater"],
+    Amusement: ["amusement_park"],
+  },
 
-  return "Entertainment";
+  Stay: {
+    Hotel: ["lodging"],
+    Resort: ["resort"],
+  },
 };
+
+const classifyPlace = (types = []) => {
+  for (const category in categoryMap) {
+    for (const subcategory in categoryMap[category]) {
+      const keywords = categoryMap[category][subcategory];
+
+      if (types.some((type) => keywords.includes(type))) {
+        return {
+          category,
+          subcategory,
+        };
+      }
+    }
+  }
+
+  return {
+    category: "Other",
+    subcategory: "General",
+  };
+};
+
+module.exports = classifyPlace;

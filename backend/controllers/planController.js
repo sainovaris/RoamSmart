@@ -34,7 +34,6 @@ exports.generateItinerary = async (req, res) => {
     // 2️⃣ Classify each place
     const classifiedPlaces = rawPlaces.map((place) => ({
       name: place.name,
-      place_id: place.place_id,
       category: classifyPlace(place.types),
       location: place.location, // ✔ correct field
       rating: place.rating || 0,
@@ -114,7 +113,6 @@ exports.generateItinerary = async (req, res) => {
 
       return {
         step: index + 1,
-        id: place.place_id,
         name: place.name,
         category: place.category,
         location: place.location,
