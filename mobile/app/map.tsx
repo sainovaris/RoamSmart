@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef} from "react";
 import { View, ActivityIndicator, Text } from "react-native";
 import MapView from "react-native-maps";
-import axios from "axios";
 
 import useCurrentLocation from "@/hooks/useCurrentLocation";
 import useTripPlanner from "@/hooks/useTripPlanner";
+import usePlaces from "@/hooks/usePlaces";
+import useAI from "@/hooks/useAI";
 
 import PlanButton from "@/components/PlanButton";
 import CategoryPicker from "@/components/CategoryPicker";
@@ -12,140 +13,37 @@ import MapMarkers from "@/components/MapMarkers";
 import HorizontalPlacesList from "@/components/HorizontalPlacesList";
 import ItineraryCard from "@/components/ItineraryCard";
 import PlaceDetailsCard from "@/components/PlaceDetailsCard";
-
-import { fetchNearbyPlaces } from "@/services/placesService";
-import { api } from "@/services/api";
-
-import { calculateDistance } from "@/utils/distance";
-import { Place, AIDetails } from "@/types/place";
+import { Place } from "@/types/place";
 
 const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
+// const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
 
 export default function Map() {
 
-  console.log("API URL:", BASE_API_URL);
+  console.log("API URL at MAP.tsx:", BASE_API_URL);
   const mapRef = useRef<MapView | null>(null);
 
   const { location, error } = useCurrentLocation();
 
-  const [places, setPlaces] = useState<Place[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const [aiDetails, setAiDetails] = useState<AIDetails | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
+  const { places, loading, fetchPlaces } = usePlaces();
+  const { itinerary, planLoading, generateTrip, setItinerary } = useTripPlanner();
+  const { aiDetails, aiLoading, fetchAIDetails, setAiDetails } = useAI();
 
-  const { itinerary, planLoading, generateTrip } = useTripPlanner();
-
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${BASE_API_URL}/places`)
-      .then(res => res.json())
-      .then(data => console.log("Backend OK:", data))
-      .catch(err => console.log("Backend not reachable:", err));
-  }, []);
 
   // ---------------- FETCH PLACES ----------------
-  const fetchPlaces = useCallback(async () => {
-
-    if (!location) return;
-
-    try {
-
-      setLoading(true);
-
-      const response = await fetchNearbyPlaces(
-        location.latitude,
-        location.longitude,
-        selectedCategory
-      );
-
-      const formatted: Place[] = response.results
-        .filter((place: any) => place.location?.lat && place.location?.lng)
-        .map((place: any) => {
-
-          const lat = place.location.lat;
-          const lng = place.location.lng;
-
-          return {
-            id: place.place_id,
-            name: place.name,
-            rating: place.rating || 0,
-            type: place.category || "Place",
-            open_now: place.is_open,
-            latitude: lat,
-            longitude: lng,
-            distance: calculateDistance(
-              location.latitude,
-              location.longitude,
-              lat,
-              lng
-            ),
-          };
-
-        });
-
-      setPlaces(formatted);
-      if (formatted.length > 0) {
-        console.log("First place:", formatted[0]);
-      }
-    } catch (err) {
-
-      console.log("Fetch places error:", err);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  }, [location, selectedCategory]);
-
   useEffect(() => {
-    fetchPlaces();
-  }, [fetchPlaces]);
+    if (location) {
+      fetchPlaces(location.latitude, location.longitude, selectedCategory);
+    }
+  }, [location, selectedCategory, fetchPlaces]);
 
   // ---------------- AI DETAILS ----------------
-  const fetchAIDetails = async (placeId: string) => {
-
-    try {
-      setAiLoading(true);
-      setAiDetails(null);
-
-      const response = await api.get(`/ai/${placeId}`);
-
-      if (response.data.success) {
-        setAiDetails(response.data.data);
-      }
-
-      console.log("AI Details for place:", response.data.data);
-    } catch (error) {
-      console.log("AI error:", error);
-    } finally {
-      setAiLoading(false);
-    }
-
-  };
-
-  // ---------------- PLACE DETAILS ----------------
-  const fetchPlaceDetails = async (placeId: string) => {
-
-    try {
-
-      const response = await axios.get(
-        `${BASE_API_URL}/place-details/${placeId}`
-      );
-
-      console.log("Place Details:", response.data);
-
-    } catch (err) {
-
-      console.log("Details error:", err);
-
-    }
-
-  };
+  useEffect(() => {
+    setAiDetails(null);
+  }, [selectedPlace, setAiDetails]);
 
   // ---------------- LOADING ----------------
   if (loading || !location) {
@@ -171,7 +69,7 @@ export default function Map() {
     <View className="flex-1">
 
       {/* Top UI Overlay */}
-      <View className="absolute top-3 left-4 right-4 z-50 space-y-3 bg-white/90 p-3 rounded-xl">
+      <View className="absolute top-12 left-4 right-4 z-50 space-y-3 bg-white/70 p-3 rounded-xl">
 
         <CategoryPicker
           selectedCategory={selectedCategory}
@@ -186,7 +84,10 @@ export default function Map() {
           }
         />
 
-        <ItineraryCard itinerary={itinerary} />
+        <ItineraryCard
+          itinerary={itinerary}
+          onClear={() => setItinerary([])}
+        />
 
       </View>
 
@@ -194,7 +95,7 @@ export default function Map() {
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
-        mapPadding={{ top: 160, bottom: 200, left: 0, right: 0 }}
+        mapPadding={{ top: 0, bottom: 0, left: 0, right: 0 }}
         showsUserLocation
         initialRegion={{
           latitude: location.latitude,
@@ -208,7 +109,6 @@ export default function Map() {
           places={places}
           selectedPlace={selectedPlace}
           setSelectedPlace={setSelectedPlace}
-          fetchPlaceDetails={fetchPlaceDetails}
           fetchAIDetails={fetchAIDetails}
         />
 

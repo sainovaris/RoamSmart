@@ -1,30 +1,56 @@
-import { View } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import { ScrollView, Pressable, Text, View } from "react-native";
 
 type Props = {
   selectedCategory: string;
   setSelectedCategory: (value: string) => void;
 };
 
+const categories = [
+  "All",
+  "Food",
+  "Nature",
+  "Culture",
+  "Shopping",
+  "Religious",
+  "Nightlife",
+  "Entertainment",
+];
+
 export default function CategoryPicker({
   selectedCategory,
   setSelectedCategory,
 }: Props) {
   return (
-    <View className=" bg-white rounded-lg">
-      <Picker
-        selectedValue={selectedCategory}
-        onValueChange={setSelectedCategory}
+    <View className="py-2">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 4 }}
       >
-        <Picker.Item label="All" value="All" />
-        <Picker.Item label="Food" value="Food" />
-        <Picker.Item label="Nature" value="Nature" />
-        <Picker.Item label="Culture" value="Culture" />
-        <Picker.Item label="Shopping" value="Shopping" />
-        <Picker.Item label="Religious" value="Religious" />
-        <Picker.Item label="Nightlife" value="Nightlife" />
-        <Picker.Item label="Entertainment" value="Entertainment" />
-      </Picker>
+        {categories.map((category) => {
+          const isSelected = selectedCategory === category;
+
+          return (
+            <Pressable
+              key={category}
+              onPress={() => setSelectedCategory(category)}
+              className={`mr-3 mb-2 px-4 py-2 rounded-full border-spacing-3 ${
+                isSelected
+                  ? "bg-[#d05203] border-gray-800"
+                  : "bg-white border-gray-800"
+              }`}
+            >
+              <Text
+                className={`text-sm font-medium px-3 ${
+                  isSelected ? "text-white" : "text-gray-700"
+                }`}
+              >
+                {category}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }

@@ -1,24 +1,32 @@
 import { Link } from "expo-router";
-import { Text, View, Pressable } from "react-native";
+import { View, Text, Pressable, Image } from "react-native";
 
 export default function Index() {
+  console.log("App loaded");
   return (
-    <View className="flex-1 bg-blue-600 justify-center items-center px-6">
+    <View className="flex-1 bg-[#7d391e] justify-center items-center px-6">
 
-      {/* App Title */}
-      <Text className="text-white text-5xl font-extrabold text-center mb-3">
-        Tour Guide App
+      {/* Logo */}
+      <Image
+        source={require("../assets/apps-imgs/logo.jpg")}
+        style={{ width: 90, height: 90, borderRadius: 18 }}
+        resizeMode="contain"
+      />
+
+      {/* App Name */}
+      <Text className="text-[#EAEAEA] text-4xl font-extrabold mt-4 mb-2">
+        Bindaas
       </Text>
 
       {/* Subtitle */}
-      <Text className="text-blue-100 text-lg text-center mb-12">
+      <Text className="text-[#EAEAEA] text-base text-center mb-10 opacity-80">
         Discover nearby places, explore the city, and plan your journey.
       </Text>
 
-      {/* Map Page Button */}
+      {/* Open Map Button */}
       <Link href="/map" asChild>
-        <Pressable className="bg-white w-full py-4 rounded-xl mb-4 shadow-lg active:opacity-80">
-          <Text className="text-blue-600 text-center text-lg font-semibold">
+        <Pressable className="bg-[#d05203] w-full py-4 rounded-xl shadow-lg active:opacity-80">
+          <Text className="text-white text-center text-lg font-semibold">
             Open Map
           </Text>
         </Pressable>

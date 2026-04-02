@@ -22,7 +22,6 @@ export default function useTripPlanner(){
         setItinerary(response.plan)
       }
 
-      console.log("Plan response:",response)
       console.log("Plan data:", response.plan);
     }
     catch(err){
@@ -37,7 +36,8 @@ export default function useTripPlanner(){
   return{
     itinerary,
     planLoading,
-    generateTrip
+    generateTrip,
+    setItinerary
   }
 
 }

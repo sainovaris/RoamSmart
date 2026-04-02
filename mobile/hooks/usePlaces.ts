@@ -23,14 +23,15 @@ export default function usePlaces(){
 
       const formatted:Place[] =
         response.results
-        .filter((p:any)=>p.location?.lat && p.location?.lng)
+        .filter((p:any)=>p.location?.lat !== undefined && p.location?.lng !== undefined)
         .map((p:any)=>{
 
           const lat = p.location.lat
           const lng = p.location.lng
 
           return{
-            id:p.place_id,
+            id: p._id,              // for AI
+            place_id: p.place_id,  // for Google APIs
             name:p.name,
             rating:p.rating || 0,
             type:p.category || "Place",

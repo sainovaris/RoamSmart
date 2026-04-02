@@ -16,7 +16,7 @@ export default function HorizontalPlacesList({
   fetchAIDetails,
 }: Props) {
   return (
-    <View className="absolute bottom-5 left-3 right-3 pb-2">
+    <View className="absolute bottom-5 left-5 right-5 pb-2">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
