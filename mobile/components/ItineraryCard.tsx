@@ -42,12 +42,12 @@ export default function ItineraryCard({ itinerary, onClear }: Props) {
       ))}
 
       {/* 🔥 Buttons */}
-      <View className="flex-row justify-between mt-3">
+      <View className="flex-column justify-between mt-1">
 
         {/* 🔊 Speak */}
         
         <Pressable
-          className="mt-5 bg-[#d05203] py-2 rounded-lg"
+          className="mt-2 bg-[#d05203] py-2 rounded-lg"
           onPress={speakPlan}
         >
           <Text className="text-center text-white">Play Audio</Text>

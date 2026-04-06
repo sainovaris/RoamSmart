@@ -44,7 +44,7 @@ export default function HorizontalPlacesList({
           >
 
             {/* Name */}
-            <Text className="font-semibold text-lg">
+            <Text className="font-semibold text-base">
               {place.name}
             </Text>
 

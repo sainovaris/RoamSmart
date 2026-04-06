@@ -10,9 +10,7 @@ const categories = [
   "Food",
   "Nature",
   "Culture",
-  "Shopping",
-  "Religious",
-  "Nightlife",
+  "Stay",
   "Entertainment",
 ];
 
@@ -25,7 +23,9 @@ export default function CategoryPicker({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 4 }}
+        contentContainerStyle={{ paddingHorizontal: 
+          1
+         }}
       >
         {categories.map((category) => {
           const isSelected = selectedCategory === category;
@@ -34,7 +34,7 @@ export default function CategoryPicker({
             <Pressable
               key={category}
               onPress={() => setSelectedCategory(category)}
-              className={`mr-3 mb-2 px-4 py-2 rounded-full border-spacing-3 ${
+              className={`mr-2 my-2 px-2 py-2 rounded-md border-spacing-3 ${
                 isSelected
                   ? "bg-[#d05203] border-gray-800"
                   : "bg-white border-gray-800"
