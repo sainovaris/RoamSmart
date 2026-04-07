@@ -80,7 +80,7 @@ export default function Map() {
         />
 
 
-        <View className="flex-row justify-between mt-2">
+        <View className="flex-row justify-between">
 
           <View className="flex-1 mr-2">
             <PlanButton

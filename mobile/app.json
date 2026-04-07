@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Bindaas",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -56,6 +56,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "286018b1-07dc-4cfd-a1b8-3b1129930400"
+      }
     }
   }
 }

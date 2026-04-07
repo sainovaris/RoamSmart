@@ -10,5 +10,9 @@ console.log("BASE URL in api.ts", BASE_URL)
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: 15000,
 });
+
+axios.get("https://roamsmart-backend-x6tj.onrender.com")
+  .then(res => console.log("SUCCESS from backend"))
+  .catch(err => console.log("FAIL", err.message));

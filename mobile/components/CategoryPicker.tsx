@@ -34,7 +34,7 @@ export default function CategoryPicker({
             <Pressable
               key={category}
               onPress={() => setSelectedCategory(category)}
-              className={`mr-2 my-2 px-2 py-2 rounded-md border-spacing-3 ${
+              className={`mr-2 my-1 px-1 py-1.5 rounded-md border-spacing-3 ${
                 isSelected
                   ? "bg-[#d05203] border-gray-800"
                   : "bg-white border-gray-800"
