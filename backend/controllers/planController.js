@@ -1,11 +1,9 @@
 const rankingService = require("../services/rankingService");
 const googleService = require("../services/googlePlacesService");
 const classifyPlace = require("../utils/classifyPlace");
-const { getDistanceMeters } = require("../utils/distanceCalc");
 const { reorderPlaces } = require("../services/reorderService");
-const filterPlacesByWeather = require("../utils/weatherCheck");
+const Place = require("../models/Place");
 
-// --------------------------- GENERATE ITINERARY ---------------------------
 exports.generateItinerary = async (req, res) => {
   try {
     const { lat, lng, totalTimeHours = 6, category } = req.body;
@@ -13,225 +11,197 @@ exports.generateItinerary = async (req, res) => {
     if (!lat || !lng) {
       return res.status(400).json({
         success: false,
-        message: "Missing coordinates"
+        message: "Missing coordinates",
       });
     }
-    
-    // 1. Get the best places using your existing service
-    // 1️⃣ Fetch nearby places from Google
-    const rawPlaces = await googleService.fetchNearbyFromGoogle(lat, lng);
-    // 🔹 Add this log to check actual Google data
-    console.log("Raw Places from Google:", rawPlaces.length);
-    console.log(rawPlaces.slice(0, 5));
-    console.log(
-      rawPlaces.map((p) => ({
-        name: p.name,
-        user_ratings_total: p.user_ratings_total,
-        rating: p.rating,
-      })),
-    );
 
-    // 2️⃣ Classify each place
-    const classifiedPlaces = rawPlaces.map((place) => ({
-      name: place.name,
-      category: classifyPlace(place.types),
-      location: place.location, // ✔ correct field
-      rating: place.rating || 0,
-      total_ratings: place.user_ratings_total || 1,
-      address: place.address || "Address not available", // ✔ correct field
-    }));
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
 
-    console.log(
-      "Classified Places with ratings:",
-      classifiedPlaces.map((p) => ({
-        name: p.name,
-        rating: p.rating,
-        total_ratings: p.total_ratings,
-        category: p.category,
-      })),
-    );
+    // ⏱️ TIME CONFIG (minutes per category)
+    const timeMap = {
+      Nature: 120,
+      Culture: 90,
+      Food: 60,
+      default: 90,
+    };
 
-    // 3️⃣ Filter by weather (replace with real API later)
-    const weather = "clear";
-    const weatherFiltered = filterPlacesByWeather(classifiedPlaces, weather);
+    let remainingTime = totalTimeHours * 60;
 
-    // 4️⃣ Filter by user-selected category if provided
-    const categoryFiltered =
-      category && category !== ""
-        ? weatherFiltered.filter((p) => p.category === category)
-        : weatherFiltered;
-
-    // 5️⃣ Rank the places
-    const rankedPlaces = rankingService.rankPlaces(
-      categoryFiltered,
-      category ? [category] : [],
-    );
-
-    // 6️⃣ Select top places
-    let selectedPlaces;
-    if (!category || category === "") {
-      const nature = rankedPlaces.filter((p) => p.category === "Nature");
-      const culture = rankedPlaces.filter((p) => p.category === "Culture");
-      const food = rankedPlaces.filter((p) => p.category === "Food");
-
-      console.log("Nature: ", nature)
-      console.log("Culture: ", culture)
-      console.log("Food: ", food)
-      selectedPlaces = [
-        ...nature.slice(0, 2),
-        ...culture.slice(0, 2),
-        ...food.slice(0, 1),
-      ];
-
-      // 🔹 fallback if categories not found
-      if (selectedPlaces.length === 0) {
-        selectedPlaces = rankedPlaces.slice(0, 5);
-      }
-    } else {
-      selectedPlaces = rankedPlaces.slice(0, 5);
-    }
-
-    // 7️⃣ Optimize order based on distance
-    const optimizedPlaces = reorderPlaces(selectedPlaces, lat, lng);
-
-    // 8️⃣ Build itinerary with time allocation
-    let currentTime = new Date();
-    currentTime.setHours(10, 0, 0); // Start tour at 10:00 AM
-
-    const itinerary = optimizedPlaces.map((place, index) => {
-      const startTime = currentTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      // Spend 1.5 hours at each attraction
-      currentTime.setMinutes(currentTime.getMinutes() + 90);
-      const endTime = currentTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      // Add 20 mins travel time for next stop
-      currentTime.setMinutes(currentTime.getMinutes() + 20);
-
-      return {
-        step: index + 1,
-        name: place.name,
-        category: place.category,
-        location: place.location,
-        visit_time: `${startTime} - ${endTime}`,
-        address: place.address,
-      };
-    });
-
-    res.status(200).json({ success: true, plan: itinerary });
-  } catch (error) {
-    console.error("Generate Itinerary Error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// --------------------------- CHECK ARRIVAL ---------------------------
-exports.checkArrival = async (req, res) => {
-  try {
-    const { userLat, userLng, placeLat, placeLng } = req.body;
-    const distance = getDistanceMeters(userLat, userLng, placeLat, placeLng);
-    const arrived = distance < 100; // less than 100 meters
-    res.json({ arrived, distance });
-  } catch (error) {
-    console.error("Check Arrival Error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-};
-
-// --------------------------- REORDER PLAN ---------------------------
-exports.reorderPlan = async (req, res) => {
-  try {
-    const { places, userLat, userLng } = req.body;
-    const sorted = reorderPlaces(places, userLat, userLng);
-    res.json(sorted);
-  } catch (error) {
-    console.error("Reorder Plan Error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-};
-
-// --------------------------- RECALCULATE PLAN ---------------------------
-exports.recalculatePlan = async (req, res) => {
-  try {
-    const { lat, lng, hours, category } = req.body;
-
-    const rawPlaces = await googleService.fetchNearbyFromGoogle(
-      lat,
-      lng,
-      "tourist_attraction",
-    );
-
-    const classifiedPlaces = rawPlaces.map((place) => ({
-      name: place.name,
-      category: classifyPlace(place.types),
+    // ================= 1️⃣ FETCH FROM DB =================
+    let dbPlaces = await Place.find({
       location: {
-        lat: place.geometry?.location?.lat,
-        lng: place.geometry?.location?.lng,
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [longitude, latitude],
+          },
+          $maxDistance: 10000,
+        },
       },
-      rating: place.rating || 0,
-      total_ratings: place.user_ratings_total || 1,
-      address: place.vicinity || "Address not available",
+    }).limit(30);
+
+    // ================= 2️⃣ GOOGLE FALLBACK =================
+    let apiPlaces = [];
+
+    if (dbPlaces.length < 10) {
+      const rawPlaces = await googleService.fetchNearbyFromGoogle(
+        latitude,
+        longitude,
+      );
+
+      apiPlaces = rawPlaces.map((place) => {
+        const { category, subcategory } = classifyPlace(place.types || []);
+
+        return {
+          place_id: place.place_id,
+          name: place.name,
+          category,
+          subcategory,
+          types: place.types,
+
+          location: {
+            lat: place.location?.lat,
+            lng: place.location?.lng,
+          },
+
+          address: place.address || "",
+          is_open: typeof place.is_open === "boolean" ? place.is_open : false,
+
+          photo: place.photo,
+          photo_reference: null,
+
+          rating: place.rating || 0,
+          total_ratings: place.user_ratings_total || 1,
+
+          source: "google",
+        };
+      });
+
+      // SAVE TO DB
+      await Promise.all(
+        apiPlaces.map((p) =>
+          Place.updateOne(
+            { place_id: p.place_id },
+            {
+              $set: {
+                ...p,
+                location: {
+                  type: "Point",
+                  coordinates: [p.location.lng, p.location.lat],
+                },
+              },
+            },
+            { upsert: true },
+          ),
+        ),
+      );
+    }
+
+    // ================= 3️⃣ NORMALIZE DB =================
+    const normalizedDB = dbPlaces.map((p) => ({
+      place_id: p.place_id,
+      name: p.name,
+      category: p.category,
+      subcategory: p.subcategory,
+      types: p.types,
+
+      location: {
+        lat: p.location.coordinates[1],
+        lng: p.location.coordinates[0],
+      },
+
+      address: p.address,
+      is_open: p.is_open,
+
+      photo: p.photo,
+      photo_reference: p.photo_reference,
+
+      rating: p.rating,
+      total_ratings: p.total_ratings,
+
+      ai_details: p.ai_details || null,
+
+      source: "db",
     }));
 
-    console.log(
-      "Classified Places for recalculation:",
-      classifiedPlaces.map((p) => ({
-        name: p.name,
-        rating: p.rating,
-        total_ratings: p.total_ratings,
-      })),
-    );
+    // ================= 4️⃣ MERGE =================
+    const allPlaces = [...normalizedDB, ...apiPlaces];
 
-    const categoryFiltered =
+    // ================= 5️⃣ CATEGORY FILTER =================
+    const filtered =
       category && category !== ""
-        ? classifiedPlaces.filter((p) => p.category === category)
-        : classifiedPlaces;
+        ? allPlaces.filter(
+            (p) =>
+              p.category && p.category.toLowerCase() === category.toLowerCase(),
+          )
+        : allPlaces;
 
-    const rankedPlaces = rankingService.rankPlaces(
-      categoryFiltered,
-      category ? [category] : [],
-    );
+    // ================= 6️⃣ RANK =================
+    const ranked = rankingService.rankPlaces(filtered);
 
-    const topPlaces = rankedPlaces.slice(0, 5);
+    // ================= 7️⃣ DISTANCE OPTIMIZE =================
+    const optimized = reorderPlaces(ranked, latitude, longitude);
 
-    const optimizedPlaces = reorderPlaces(topPlaces, lat, lng);
+    // ================= 8️⃣ BUILD ITINERARY =================
+    let currentTime = new Date(); // 🔥 REAL CURRENT TIME
 
-    let currentTime = new Date();
-    currentTime.setHours(10, 0, 0);
+    const itinerary = [];
 
-    const itinerary = optimizedPlaces.map((place, index) => {
-      const startTime = currentTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+    for (let place of optimized) {
+      const duration = timeMap[place.category] || timeMap.default;
 
-      currentTime.setMinutes(currentTime.getMinutes() + 90);
-      const endTime = currentTime.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      if (remainingTime < duration) break;
 
-      currentTime.setMinutes(currentTime.getMinutes() + 20);
+      const start = new Date(currentTime);
+      const end = new Date(currentTime.getTime() + duration * 60000);
 
-      return {
-        step: index + 1,
+      currentTime = new Date(end.getTime() + 20 * 60000); // travel buffer
+
+      remainingTime -= duration;
+
+      itinerary.push({
+        step: itinerary.length + 1,
+
+        place_id: place.place_id,
         name: place.name,
-        category: place.category,
-        location: place.location,
-        visit_time: `${startTime} - ${endTime}`,
-        address: place.address,
-      };
-    });
 
-    res.json({ success: true, plan: itinerary });
+        category: place.category,
+        subcategory: place.subcategory,
+
+        location: place.location,
+        address: place.address,
+        is_open: place.is_open,
+
+        photo: place.photo,
+
+        // 🔥 AI DETAILS INCLUDED
+        ai_details: place.ai_details || null,
+
+        score: place.relevance_score,
+        source: place.source,
+
+        visit_start: start,
+        visit_end: end,
+        duration_minutes: duration,
+      });
+    }
+
+    // ================= RESPONSE =================
+    res.status(200).json({
+      success: true,
+      total_places: itinerary.length,
+      totalTimeHours,
+      remainingTimeHours: (remainingTime / 60).toFixed(2),
+      plan: itinerary,
+    });
   } catch (error) {
-    console.error("Recalculate Plan Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error("Itinerary Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate itinerary",
+      error: error.message,
+    });
   }
 };

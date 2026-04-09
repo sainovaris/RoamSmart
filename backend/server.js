@@ -21,6 +21,9 @@ const healthRoutes = require("./routes/healthRoutes");
 const placesRoutes = require("./routes/placesRoutes");
 const planRoutes = require("./routes/planRoutes");
 const aiRoutes = require("./routes/aiRoutes");
+const videoAssistant = require("./routes/videoAssistant");
+
+app.use("/api/videos", videoAssistant);
 
 app.use("/api/ai", aiRoutes);
 app.use("/api/plan", planRoutes);
