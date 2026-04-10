@@ -3,6 +3,29 @@ const googleService = require("../services/googlePlacesService");
 const classifyPlace = require("../utils/classifyPlace");
 const { reorderPlaces } = require("../services/reorderService");
 const Place = require("../models/Place");
+const { fetchVideos } = require("../services/youtubeService");
+const { rankVideos } = require("../services/videoRankingService");
+const { generateItinerarySummary } = require("../services/itineraryAI");
+
+
+// ================= PARSE AI DURATION =================
+function parseDuration(durationStr) {
+  if (!durationStr) return 90;
+
+  const str = durationStr.toLowerCase();
+
+  const rangeMatch = str.match(/(\d+)-(\d+)/);
+  if (rangeMatch) {
+    return ((parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2) * 60;
+  }
+
+  const hourMatch = str.match(/(\d+)/);
+  if (hourMatch) {
+    return parseInt(hourMatch[1]) * 60;
+  }
+
+  return 90;
+}
 
 exports.generateItinerary = async (req, res) => {
   try {
@@ -18,13 +41,6 @@ exports.generateItinerary = async (req, res) => {
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
 
-    // ⏱️ TIME CONFIG (minutes per category)
-    const timeMap = {
-      Nature: 120,
-      Culture: 90,
-      Food: 60,
-      default: 90,
-    };
 
     let remainingTime = totalTimeHours * 60;
 
@@ -137,64 +153,89 @@ exports.generateItinerary = async (req, res) => {
           )
         : allPlaces;
 
+    // ================= REMOVE CLOSED PLACES =================
+const openPlaces = filtered.filter((p) => p.is_open !== false);
+
     // ================= 6️⃣ RANK =================
-    const ranked = rankingService.rankPlaces(filtered);
+    const ranked = rankingService.rankPlaces(openPlaces);
+
+    // ================= SMART TIME FILTER =================
+const currentHour = new Date().getHours();
+
+const smartFiltered = ranked.filter((place) => {
+  if (place.category === "Food" && currentHour < 11) return false;
+  if (place.category === "Nightlife" && currentHour < 17) return false;
+  return true;
+});
 
     // ================= 7️⃣ DISTANCE OPTIMIZE =================
-    const optimized = reorderPlaces(ranked, latitude, longitude);
+    const optimized = reorderPlaces(smartFiltered, latitude, longitude);
 
-    // ================= 8️⃣ BUILD ITINERARY =================
-    let currentTime = new Date(); // 🔥 REAL CURRENT TIME
+   
+let currentTime = new Date();
+remainingTime = totalTimeHours * 60;
 
-    const itinerary = [];
+const itinerary = [];
 
-    for (let place of optimized) {
-      const duration = timeMap[place.category] || timeMap.default;
+for (let place of optimized) {
+  if (!place.ai_details) continue;
 
-      if (remainingTime < duration) break;
+  let duration = parseDuration(place.ai_details?.recommended_duration);
 
-      const start = new Date(currentTime);
-      const end = new Date(currentTime.getTime() + duration * 60000);
+  console.log("Checking:", place.name, duration, remainingTime);
 
-      currentTime = new Date(end.getTime() + 20 * 60000); // travel buffer
-
-      remainingTime -= duration;
-
-      itinerary.push({
-        step: itinerary.length + 1,
-
-        place_id: place.place_id,
-        name: place.name,
-
-        category: place.category,
-        subcategory: place.subcategory,
-
-        location: place.location,
-        address: place.address,
-        is_open: place.is_open,
-
-        photo: place.photo,
-
-        // 🔥 AI DETAILS INCLUDED
-        ai_details: place.ai_details || null,
-
-        score: place.relevance_score,
-        source: place.source,
-
-        visit_start: start,
-        visit_end: end,
-        duration_minutes: duration,
-      });
+  if (remainingTime < duration) {
+    if (itinerary.length === 0) {
+      duration = remainingTime;
+    } else {
+      continue;
     }
+  }
 
-    // ================= RESPONSE =================
-    res.status(200).json({
-      success: true,
-      total_places: itinerary.length,
-      totalTimeHours,
-      remainingTimeHours: (remainingTime / 60).toFixed(2),
-      plan: itinerary,
-    });
+  const start = new Date(currentTime);
+  const end = new Date(currentTime.getTime() + duration * 60000);
+
+  currentTime = new Date(end.getTime() + 20 * 60000);
+  remainingTime -= duration;
+
+  let videos = [];
+  try {
+    const rawVideos = await fetchVideos(place.name);
+    videos = rankVideos(rawVideos, place.name);
+  } catch (err) {}
+
+  itinerary.push({
+    step: itinerary.length + 1,
+    name: place.name,
+    duration_minutes: duration,
+    visit_start: start,
+    visit_end: end,
+    ai_details: place.ai_details,
+    videos,
+  });
+}
+if (itinerary.length === 0) {
+  return res.status(200).json({
+    success: true,
+    message: "No places fit within the given time",
+    total_places: 0,
+    plan: [],
+  });
+}
+let summary = "";
+
+if (itinerary.length > 0) {
+  summary = await generateItinerarySummary(itinerary);
+}
+
+res.status(200).json({
+  success: true,
+  summary,
+  total_places: itinerary.length,
+  totalTimeHours,
+  remainingTimeHours: (remainingTime / 60).toFixed(2),
+  plan: itinerary,
+});
   } catch (error) {
     console.error("Itinerary Error:", error);
 

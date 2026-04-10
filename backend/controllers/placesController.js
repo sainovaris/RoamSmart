@@ -196,9 +196,11 @@ exports.getRealNearbyPlaces = async (req, res) => {
           p.category && p.category.toLowerCase() === category.toLowerCase(),
       );
     }
+ const openPlaces = cleanedResults.filter((p) => p.is_open !== false);
 
+const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
     // ================= STEP 4: GENERATE AI FOR ALL =================
-    for (const place of cleanedResults) {
+    for (const place of finalPlaces) {
       try {
         // 🔥 CHECK DB FIRST (avoid cost)
         const existing = await Place.findOne({
@@ -225,7 +227,7 @@ exports.getRealNearbyPlaces = async (req, res) => {
 
     // ================= STEP 5: SAVE TO DB =================
     await Promise.all(
-      cleanedResults.map((place) =>
+      finalPlaces.map((place) =>
         Place.updateOne(
           { place_id: place.place_id },
           {
@@ -246,7 +248,7 @@ exports.getRealNearbyPlaces = async (req, res) => {
 
     // ================= STEP 6: RANK =================
     const rankedResults = rankingService.rankPlaces(
-      cleanedResults,
+      finalPlaces,
       latitude,
       longitude,
     );
