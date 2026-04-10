@@ -6,7 +6,7 @@ const Place = require("../models/Place");
 const { fetchVideos } = require("../services/youtubeService");
 const { rankVideos } = require("../services/videoRankingService");
 const { generateItinerarySummary } = require("../services/itineraryAI");
-
+const { generatePlaceDetails } = require("../services/openaiService");
 
 // ================= PARSE AI DURATION =================
 function parseDuration(durationStr) {
@@ -41,7 +41,6 @@ exports.generateItinerary = async (req, res) => {
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
 
-
     let remainingTime = totalTimeHours * 60;
 
     // ================= 1️⃣ FETCH FROM DB =================
@@ -66,10 +65,25 @@ exports.generateItinerary = async (req, res) => {
         longitude,
       );
 
-      apiPlaces = rawPlaces.map((place) => {
+      const enrichedPlaces = [];
+
+      for (let place of rawPlaces) {
         const { category, subcategory } = classifyPlace(place.types || []);
 
-        return {
+        let aiDetails = null;
+
+        try {
+          // 🔥 GENERATE AI DETAILS
+          aiDetails = await generatePlaceDetails({
+            name: place.name,
+            category,
+            subcategory,
+          });
+        } catch (err) {
+          console.error("AI Error:", err.message);
+        }
+
+        const formattedPlace = {
           place_id: place.place_id,
           name: place.name,
           category,
@@ -90,13 +104,17 @@ exports.generateItinerary = async (req, res) => {
           rating: place.rating || 0,
           total_ratings: place.user_ratings_total || 1,
 
+          ai_details: aiDetails || null,
+
           source: "google",
         };
-      });
 
-      // SAVE TO DB
+        enrichedPlaces.push(formattedPlace);
+      }
+
+      // 🔥 SAVE TO DB WITH AI DETAILS
       await Promise.all(
-        apiPlaces.map((p) =>
+        enrichedPlaces.map((p) =>
           Place.updateOne(
             { place_id: p.place_id },
             {
@@ -112,6 +130,9 @@ exports.generateItinerary = async (req, res) => {
           ),
         ),
       );
+
+      // 🔥 USE THESE PLACES IMMEDIATELY
+      apiPlaces = enrichedPlaces;
     }
 
     // ================= 3️⃣ NORMALIZE DB =================
@@ -145,7 +166,7 @@ exports.generateItinerary = async (req, res) => {
     const allPlaces = [...normalizedDB, ...apiPlaces];
 
     // ================= 5️⃣ CATEGORY FILTER =================
-    const filtered =
+    let filtered =
       category && category !== ""
         ? allPlaces.filter(
             (p) =>
@@ -153,89 +174,92 @@ exports.generateItinerary = async (req, res) => {
           )
         : allPlaces;
 
+    // 🔥 IMPORTANT: fallback if nothing found
+    if (filtered.length === 0) {
+      console.log("No category match → using all places");
+      filtered = allPlaces;
+    }
+
     // ================= REMOVE CLOSED PLACES =================
-const openPlaces = filtered.filter((p) => p.is_open !== false);
+    const openPlaces = filtered.filter((p) => p.is_open !== false);
 
     // ================= 6️⃣ RANK =================
     const ranked = rankingService.rankPlaces(openPlaces);
 
     // ================= SMART TIME FILTER =================
-const currentHour = new Date().getHours();
+    const currentHour = new Date().getHours();
 
-const smartFiltered = ranked.filter((place) => {
-  if (place.category === "Food" && currentHour < 11) return false;
-  if (place.category === "Nightlife" && currentHour < 17) return false;
-  return true;
-});
+    const smartFiltered = ranked; // 🔥 disable for now
 
     // ================= 7️⃣ DISTANCE OPTIMIZE =================
-    const optimized = reorderPlaces(smartFiltered, latitude, longitude);
+    const optimized = smartFiltered;
+    let currentTime = new Date();
+    remainingTime = totalTimeHours * 60;
 
-   
-let currentTime = new Date();
-remainingTime = totalTimeHours * 60;
+    const itinerary = [];
 
-const itinerary = [];
+    for (let place of optimized) {
 
-for (let place of optimized) {
-  if (!place.ai_details) continue;
+      let duration = parseDuration(place.ai_details?.recommended_duration);
 
-  let duration = parseDuration(place.ai_details?.recommended_duration);
+      console.log("Checking:", place.name, duration, remainingTime);
 
-  console.log("Checking:", place.name, duration, remainingTime);
+      if (remainingTime < duration) {
+        if (itinerary.length === 0) {
+          duration = remainingTime; // force at least 1 place
+        } else {
+          break;
+        }
+      }
 
-  if (remainingTime < duration) {
-    if (itinerary.length === 0) {
-      duration = remainingTime;
-    } else {
-      continue;
+      const start = new Date(currentTime);
+      const end = new Date(currentTime.getTime() + duration * 60000);
+
+      currentTime = new Date(end.getTime() + 20 * 60000);
+      remainingTime -= duration;
+
+      let videos = [];
+      try {
+        const rawVideos = await fetchVideos(place.name);
+        videos = rankVideos(rawVideos, place.name);
+      } catch (err) {}
+
+      itinerary.push({
+        step: itinerary.length + 1,
+        name: place.name,
+        duration_minutes: duration,
+        visit_start: start,
+        visit_end: end,
+        ai_details: place.ai_details,
+        videos,
+      });
+      console.log("PLACE:", place.name);
+      console.log("CATEGORY:", place.category);
+      console.log("DURATION:", duration);
+      console.log("REMAINING:", remainingTime);
     }
-  }
+    if (itinerary.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No places fit within the given time",
+        total_places: 0,
+        plan: [],
+      });
+    }
+    let summary = "";
 
-  const start = new Date(currentTime);
-  const end = new Date(currentTime.getTime() + duration * 60000);
+    if (itinerary.length > 0) {
+      summary = await generateItinerarySummary(itinerary);
+    }
 
-  currentTime = new Date(end.getTime() + 20 * 60000);
-  remainingTime -= duration;
-
-  let videos = [];
-  try {
-    const rawVideos = await fetchVideos(place.name);
-    videos = rankVideos(rawVideos, place.name);
-  } catch (err) {}
-
-  itinerary.push({
-    step: itinerary.length + 1,
-    name: place.name,
-    duration_minutes: duration,
-    visit_start: start,
-    visit_end: end,
-    ai_details: place.ai_details,
-    videos,
-  });
-}
-if (itinerary.length === 0) {
-  return res.status(200).json({
-    success: true,
-    message: "No places fit within the given time",
-    total_places: 0,
-    plan: [],
-  });
-}
-let summary = "";
-
-if (itinerary.length > 0) {
-  summary = await generateItinerarySummary(itinerary);
-}
-
-res.status(200).json({
-  success: true,
-  summary,
-  total_places: itinerary.length,
-  totalTimeHours,
-  remainingTimeHours: (remainingTime / 60).toFixed(2),
-  plan: itinerary,
-});
+    res.status(200).json({
+      success: true,
+      summary,
+      total_places: itinerary.length,
+      totalTimeHours,
+      remainingTimeHours: (remainingTime / 60).toFixed(2),
+      plan: itinerary,
+    });
   } catch (error) {
     console.error("Itinerary Error:", error);
 
