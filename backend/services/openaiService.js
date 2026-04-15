@@ -5,7 +5,8 @@ const openai = new OpenAI({
 });
 
 const generatePlaceDetails = async (place) => {
-  const prompt = `
+  try {
+    const prompt = `
 Return ONLY valid JSON. No explanation. No markdown.
 
 Schema:
@@ -24,39 +25,26 @@ Category: ${place.category}
 Location: ${place.location?.lat || "unknown"}, ${place.location?.lng || "unknown"}
 `;
 
-  const response = await openai.responses.create({
-    model: "gpt-4o-mini",
-    input: [
-      {
-        role: "system",
-        content: "You must respond ONLY with valid JSON.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
+    const response = await openai.responses.create({
+      model: "gpt-4o-mini",
+      input: prompt, // ✅ FIXED
+    });
 
-  let content = response.output_text.trim();
+    let rawText = "";
 
-  // clean markdown if present
-  content = content.replace(/```json|```/g, "").trim();
+    try {
+      rawText = response.output[0].content[0].text;
+    } catch (e) {
+      console.error("Extraction Error:", e);
+      return null;
+    }
 
-  try {
-    return JSON.parse(content);
+    const cleaned = rawText.replace(/```json|```/g, "").trim();
+
+    return JSON.parse(cleaned);
   } catch (err) {
-    console.error("RAW AI:", content);
-
-    return {
-      overview: "",
-      highlights: [],
-      best_time_to_visit: "",
-      travel_tips: "",
-      recommended_duration: "",
-      booking_required: false,
-    };
+    console.error("AI ERROR:", err.message);
+    return null;
   }
 };
-
 module.exports = { generatePlaceDetails };
