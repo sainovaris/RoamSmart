@@ -56,6 +56,6 @@ const placeSchema = new mongoose.Schema({
 
 // Indexes
 placeSchema.index({ location: "2dsphere" });
-placeSchema.index({ place_id: 1 });
+
 
 module.exports = mongoose.models.Place || mongoose.model("Place", placeSchema);
