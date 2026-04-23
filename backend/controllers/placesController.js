@@ -4,7 +4,6 @@ const rankingService = require("../services/rankingService");
 const classifyPlace = require("../utils/classifyPlace");
 const { generatePlaceDetails } = require("../services/openaiService");
 
-// --------------------------- FIND NEARBY PLACES FROM DATABASE ---------------------------
 async function findNearbyPlaces(lat, lng) {
   const places = await Place.find({
     location: {
@@ -17,7 +16,6 @@ async function findNearbyPlaces(lat, lng) {
       },
     },
   });
-
   return places;
 }
 
@@ -35,21 +33,15 @@ exports.testInsert = async (req, res) => {
     };
 
     const savedPlace = await Place.create(testPlace);
-
-    res.json({
-      message: "Place stored successfully",
-      data: savedPlace,
-    });
+    res.json({ message: "Place stored successfully", data: savedPlace });
   } catch (error) {
     console.log(error);
   }
 };
 
-// --------------------------- GET ALL MANUAL PLACES ---------------------------
 exports.getAllPlaces = async (req, res) => {
   try {
     const places = await Place.find();
-
     res.status(200).json({
       success: true,
       count: places.length,
@@ -64,7 +56,6 @@ exports.getAllPlaces = async (req, res) => {
   }
 };
 
-// --------------------------- GET NEARBY MANUAL PLACES ---------------------------
 exports.getNearbyPlaces = async (req, res) => {
   try {
     const { lat, lng, type } = req.query;
@@ -91,23 +82,18 @@ exports.getNearbyPlaces = async (req, res) => {
       },
     };
 
-    if (type) {
-      query.type = type;
-    }
+    if (type) query.type = type;
 
     const places = await Place.find(query);
 
     const plainPlaces = places.map((p) => {
       const obj = p.toObject();
-
-      // 🔥 Normalize location here
       if (obj.location?.coordinates) {
         obj.location = {
           lat: obj.location.coordinates[1],
           lng: obj.location.coordinates[0],
         };
       }
-
       return obj;
     });
 
@@ -134,7 +120,6 @@ exports.getNearbyPlaces = async (req, res) => {
   }
 };
 
-// --------------------------- GET REAL GOOGLE NEARBY PLACES (WITH CACHING) ---------------------------
 exports.getRealNearbyPlaces = async (req, res) => {
   try {
     const { lat, lng, type, category } = req.query;
@@ -149,83 +134,74 @@ exports.getRealNearbyPlaces = async (req, res) => {
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
 
-    // ================= STEP 1: GOOGLE API =================
+    // ===== STEP 1: Google API =====
     const googleResults = await googleService.fetchNearbyFromGoogle(
       latitude,
       longitude,
       type,
     );
 
-    // ================= STEP 2: CLEAN DATA =================
+    // ===== STEP 2: Clean Data =====
     let cleanedResults = googleResults
       .map((place) => {
         if (!place) return null;
-
-        const { category, subcategory } = classifyPlace(place.types || []);
-
+        const { category: cat, subcategory } = classifyPlace(place.types || []);
         return {
           place_id: place.place_id,
           name: place.name || "Unknown",
           rating: place.rating || 0,
           total_ratings: place.user_ratings_total || 1,
-
           address: place.address || place.vicinity || "Address not available",
-
           types: place.types || [],
-          category,
+          category: cat,
           subcategory,
-
           is_open: typeof place.is_open === "boolean" ? place.is_open : false,
           photo: place.photo || null,
           photo_reference: null,
-
           location: {
             lat: place.location?.lat || null,
             lng: place.location?.lng || null,
           },
-
-          ai_details: null, // will fill below
+          ai_details: null,
         };
       })
       .filter(Boolean);
 
-    // ================= STEP 3: CATEGORY FILTER =================
+    // ===== STEP 3: Category Filter =====
     if (category && category !== "") {
       cleanedResults = cleanedResults.filter(
         (p) =>
           p.category && p.category.toLowerCase() === category.toLowerCase(),
       );
     }
- const openPlaces = cleanedResults.filter((p) => p.is_open !== false);
 
-const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
-    // ================= STEP 4: GENERATE AI FOR ALL =================
-    for (const place of finalPlaces) {
-      try {
-        // 🔥 CHECK DB FIRST (avoid cost)
-        const existing = await Place.findOne({
-          place_id: place.place_id,
-        });
+    const openPlaces = cleanedResults.filter((p) => p.is_open !== false);
+    const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
 
-        if (existing?.ai_details?.generated_at) {
-          place.ai_details = existing.ai_details;
-          continue;
+    // ===== STEP 4: Generate AI in Parallel =====
+    await Promise.all(
+      finalPlaces.map(async (place) => {
+        try {
+          // Check DB cache first
+          const existing = await Place.findOne({ place_id: place.place_id });
+          if (existing?.ai_details?.generated_at) {
+            place.ai_details = existing.ai_details;
+            return;
+          }
+
+          // Call OpenAI
+          const aiData = await generatePlaceDetails(place);
+          place.ai_details = aiData
+            ? { ...aiData, generated_at: new Date() }
+            : null;
+        } catch (err) {
+          console.error("AI ERROR:", err.message);
+          place.ai_details = null;
         }
+      }),
+    );
 
-        // 🔥 CALL OPENAI
-        const aiData = await generatePlaceDetails(place);
-
-        place.ai_details = {
-          ...aiData,
-          generated_at: new Date(),
-        };
-      } catch (err) {
-        console.error("AI ERROR:", err.message);
-        place.ai_details = null;
-      }
-    }
-
-    // ================= STEP 5: SAVE TO DB =================
+    // ===== STEP 5: Save to DB =====
     await Promise.all(
       finalPlaces.map((place) =>
         Place.updateOne(
@@ -246,14 +222,13 @@ const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
       ),
     );
 
-    // ================= STEP 6: RANK =================
+    // ===== STEP 6: Rank =====
     const rankedResults = rankingService.rankPlaces(
       finalPlaces,
       latitude,
       longitude,
     );
 
-    // ================= RESPONSE =================
     res.status(200).json({
       success: true,
       source: "google",
@@ -265,7 +240,6 @@ const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
     });
   } catch (error) {
     console.error("Google Nearby Error:", error);
-
     res.status(500).json({
       success: false,
       message: "Google API or AI issues",
@@ -273,31 +247,25 @@ const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
     });
   }
 };
-// --------------------------- GET PLACE DETAILS ---------------------------
+
 exports.getPlaceDetails = async (req, res) => {
   try {
     const { placeId } = req.params;
-
     const details = await googleService.getPlaceDetailsFromGoogle(placeId);
 
     if (!details) {
-      return res.status(404).json({
-        success: false,
-        message: "Place not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Place not found" });
     }
 
-    // Generate main photo URL
     if (details.photos && details.photos.length > 0) {
       details.main_photo_url = googleService.getPhotoUrl(
         details.photos[0].photo_reference,
       );
     }
 
-    res.status(200).json({
-      success: true,
-      results: details,
-    });
+    res.status(200).json({ success: true, results: details });
   } catch (error) {
     console.error("Place Details Error:", error);
     res.status(500).json({

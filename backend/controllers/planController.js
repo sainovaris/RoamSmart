@@ -231,6 +231,36 @@ exports.generateItinerary = async (req, res) => {
           "🌐 Google places after category filter:",
           googlePlaces.length,
         );
+
+        // ===== SAVE GOOGLE PLACES TO DB =====
+        // So next request finds them in DB and doesn't hit Google again
+        if (googlePlaces.length > 0) {
+          try {
+            await Promise.all(
+              googlePlaces.map((place) =>
+                Place.updateOne(
+                  { place_id: place.place_id },
+                  {
+                    $set: {
+                      ...place,
+                      location: {
+                        type: "Point",
+                        coordinates: [place.location.lng, place.location.lat],
+                      },
+                    },
+                  },
+                  { upsert: true },
+                ),
+              ),
+            );
+            console.log("💾 Saved Google places to DB:", googlePlaces.length);
+          } catch (saveErr) {
+            console.warn(
+              "⚠️ Failed to save Google places to DB:",
+              saveErr.message,
+            );
+          }
+        }
       } catch (googleErr) {
         console.error("❌ Google API failed:", googleErr.message);
       }

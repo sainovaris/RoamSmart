@@ -22,23 +22,16 @@ Schema:
 Place Details:
 Name: ${place.name}
 Category: ${place.category}
+Subcategory: ${place.subcategory || ""}
 Location: ${place.location?.lat || "unknown"}, ${place.location?.lng || "unknown"}
 `;
 
-    const response = await openai.responses.create({
+    const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      input: prompt, // ✅ FIXED
+      messages: [{ role: "user", content: prompt }],
     });
 
-    let rawText = "";
-
-    try {
-      rawText = response.output[0].content[0].text;
-    } catch (e) {
-      console.error("Extraction Error:", e);
-      return null;
-    }
-
+    const rawText = response.choices[0].message.content;
     const cleaned = rawText.replace(/```json|```/g, "").trim();
 
     return JSON.parse(cleaned);
@@ -47,4 +40,5 @@ Location: ${place.location?.lat || "unknown"}, ${place.location?.lng || "unknown
     return null;
   }
 };
+
 module.exports = { generatePlaceDetails };

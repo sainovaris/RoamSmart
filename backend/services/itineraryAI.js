@@ -13,13 +13,19 @@ Create a fun, short itinerary description like a guide.
 Mention:
 - flow of day
 - vibe of places
-${places.map((p, i) => `${i + 1}. ${p.name}`).join("\n")}
+
+${places.map((p, i) => `${i + 1}. ${p.name} (${p.category})`).join("\n")}
 `;
 
-  const res = await openai.responses.create({
-    model: "gpt-4o-mini",
-    input: prompt,
-  });
+  try {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+    });
 
-  return res.output_text;
+    return res.choices[0].message.content;
+  } catch (err) {
+    console.error("Itinerary Summary Error:", err.message);
+    return "";
+  }
 };
