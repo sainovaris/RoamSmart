@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Environment variables (API Keys)
+.env
+
+# Expo/Mobile specific
+.expo/
+dist/
+npm-debug.log*
+
+# OS specific
+.DS_Store
+Thumbs.db
