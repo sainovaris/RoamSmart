@@ -22,6 +22,7 @@ const placesRoutes = require("./routes/placesRoutes");
 const planRoutes = require("./routes/planRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const videoAssistant = require("./routes/videoAssistant");
+const routeRoutes = require("./routes/routeRoutes");
 
 app.use("/api/videos", videoAssistant);
 
@@ -34,9 +35,15 @@ app.get("/", (req, res) => {
 const errorHandler = require("./middleware/errorHandler");
 app.use(errorHandler);
 
+
+app.use("/api/route", routeRoutes);
 app.use("/api", healthRoutes);
 app.use("/api", placesRoutes);
 
+app.use((req, res, next) => {
+  console.log("📥 Incoming request:", req.method, req.url);
+  next();
+});
 
 // Global Error Handling Middleware
 app.use((err, req, res, next) => {
