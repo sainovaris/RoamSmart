@@ -1,21 +1,47 @@
 const axios = require("axios");
-exports.fetchVideos = async (query) => {
+
+exports.fetchVideos = async (placeName, city = "Rajkot", country = "India") => {
   try {
     const API_KEY = process.env.YOUTUBE_API_KEY;
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(
-      query,
-    )}&type=video&maxResults=5&key=${API_KEY}`;
+    // 🎯 Strong query (VERY IMPORTANT)
+    const query = `${placeName} ${city} ${country} travel guide`;
 
-    const res = await axios.get(url);
+    console.log("🎬 YouTube search query:", query);
 
-    const videos = res.data.items;
+    const searchRes = await axios.get(
+      "https://www.googleapis.com/youtube/v3/search",
+      {
+        params: {
+          key: API_KEY,
+          q: query,
+          part: "snippet",
+          type: "video",
+          maxResults: 5,
+          relevanceLanguage: "en", // 🔥 improves results
+        },
+      }
+    );
 
-    // 🔥 SECOND API CALL (for stats)
-    const ids = videos.map((v) => v.id.videoId).join(",");
+    const items = searchRes.data.items || [];
+
+    // ✅ Safe video IDs
+    const videoIds = items
+      .map((v) => v.id?.videoId)
+      .filter(Boolean)
+      .join(",");
+
+    if (!videoIds) return [];
 
     const statsRes = await axios.get(
-      `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${ids}&key=${API_KEY}`,
+      "https://www.googleapis.com/youtube/v3/videos",
+      {
+        params: {
+          key: API_KEY,
+          id: videoIds,
+          part: "statistics,snippet",
+        },
+      }
     );
 
     return statsRes.data.items.map((item) => ({
@@ -25,11 +51,14 @@ exports.fetchVideos = async (query) => {
 
       views: parseInt(item.statistics.viewCount || 0),
       likes: parseInt(item.statistics.likeCount || 0),
-
       publishedAt: item.snippet.publishedAt,
     }));
+
   } catch (err) {
-    console.error("YouTube Error:", err.message);
+    console.error(
+      "❌ YouTube Error:",
+      err?.response?.data || err.message
+    );
     return [];
   }
 };

@@ -6,6 +6,7 @@ const { generateItinerarySummary } = require("../services/itineraryAI");
 const { fetchVideos } = require("../services/youtubeService");
 const { rankVideos } = require("../services/videoRankingService");
 const googleService = require("../services/googlePlacesService");
+const { getLocationInfo } = require("../utils/getLocationInfo");
 
 // ================= PARSE AI DURATION =================
 function parseDuration(durationStr) {
@@ -276,6 +277,8 @@ exports.getNearbyForSelection = async (req, res) => {
 // Body: { place_ids: [...], totalTimeHours: 4, startTime: "09:00" }
 // =================================================================
 exports.generateCustomItinerary = async (req, res) => {
+  const { lat, lng } = req.body;
+
   try {
     const {
       place_ids = [],
@@ -376,12 +379,20 @@ exports.generateCustomItinerary = async (req, res) => {
       currentTime = new Date(end.getTime() + 20 * 60000); // 20 min travel buffer
       remainingTime -= duration;
 
-      // Fetch YouTube videos
+      // Fetch You Tube Videos
       let videos = [];
+
       try {
-        const rawVideos = await fetchVideos(place.name);
+        const { city, country } = await getLocationInfo(lat, lng);
+
+        console.log("📍 User Location:", city, country);
+
+        const rawVideos = await fetchVideos(place.name, city, country);
+
         videos = rankVideos(rawVideos, place.name);
-      } catch {}
+      } catch (err) {
+        console.log("❌ Video fetch error:", err.message);
+      }
 
       if (place?.location?.lat == null || place?.location?.lng == null) {
         console.log("❌ Skipping place (no coords):", place.name);
@@ -413,10 +424,9 @@ exports.generateCustomItinerary = async (req, res) => {
         ai_details: place.ai_details,
         videos,
       });
-
-      console.log("🚀 Sending place_id:", place.place_id);
     }
 
+    console.log("📦 FINAL RESPONSE SAMPLE:", itinerary[0]);
     console.log("📋 Final custom itinerary:", itinerary.length, "places");
 
     // ===== STEP 6: Generate summary =====
