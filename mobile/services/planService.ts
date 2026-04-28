@@ -1,14 +1,24 @@
 import { api } from "./api";
 
-export const generatePlan = async (
-  lat: number,
-  lng: number,
-  duration: number
-) => {
-  const response = await api.post("/plan/generate-plan", {
+type GeneratePlanPayload = {
+  lat: number;
+  lng: number;
+  duration: number;
+  categories: string[];
+  placeIds: string[];
+};
+
+export const generatePlan = async ({
+  lat,
+  lng,
+  duration,
+  placeIds,
+}: GeneratePlanPayload) => {
+  const response = await api.post("/plan/custom", {
     lat,
     lng,
-    duration,
+    totalTimeHours: duration,
+    place_ids: placeIds,
   });
 
   console.log("Plan generation response:", response.data);

@@ -1,63 +1,110 @@
-import { useEffect, useState, useRef} from "react";
-import { View, ActivityIndicator, Text } from "react-native";
+
+import { useEffect, useState, useRef, useCallback } from "react";
+
+import { View, ActivityIndicator, Text, Pressable } from "react-native";
 import MapView from "react-native-maps";
 import PlanOwnButton from "@/components/PlanOwnButton";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 
 import useCurrentLocation from "@/hooks/useCurrentLocation";
-import useTripPlanner from "@/hooks/useTripPlanner";
 import usePlaces from "@/hooks/usePlaces";
 import useAI from "@/hooks/useAI";
 
-import PlanButton from "@/components/PlanButton";
 import CategoryPicker from "@/components/CategoryPicker";
 import MapMarkers from "@/components/MapMarkers";
 import HorizontalPlacesList from "@/components/HorizontalPlacesList";
 import ItineraryCard from "@/components/ItineraryCard";
 import PlaceDetailsCard from "@/components/PlaceDetailsCard";
+import NavigationPlaceCard from "@/components/NavigationPlaceCard";
+
 import { Place } from "@/types/place";
 
-// const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
-const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
+import { useTrip } from "@/context/TripContext";
+import RoutePolyline from "@/components/RoutePolyline";
+import useVoiceGuide from "@/hooks/useVoiceGuide";
+
+
+const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
+// const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
+
 
 export default function Map() {
-
   console.log("API URL at MAP.tsx:", BASE_API_URL);
+
   const mapRef = useRef<MapView | null>(null);
   const router = useRouter();
-  
+
   const { location, error } = useCurrentLocation();
+  const { itinerary, isNavigating, routeCoords, currentStepIndex } = useTrip();
+
+  const currentPlace = itinerary[currentStepIndex];
+
+  useVoiceGuide(isNavigating ? location : null);
 
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const { places, loading, fetchPlaces } = usePlaces();
-  const { itinerary, planLoading, generateTrip, setItinerary } = useTripPlanner();
   const { aiDetails, aiLoading, fetchAIDetails, setAiDetails } = useAI();
 
+  const { resetTrip } = useTrip();
 
-  // ---------------- FETCH PLACES ----------------
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetTrip();
+      };
+    }, [resetTrip])
+  );
+
+  const itineraryPlaces: Place[] = itinerary
+    .filter((item) => item.latitude != null && item.longitude != null)
+    .map((item, index) => ({
+      id: `itinerary-${index}`,
+      place_id: item.place_id,
+      name: item.name,
+      latitude: item.latitude as number,
+      longitude: item.longitude as number,
+      rating: 0,
+      type: item.category,
+      open_now: true,
+      distance: 0,
+    }));
+
+  // 📡 Fetch places (ONLY in exploration mode)
   useEffect(() => {
-    if (location) {
+    if (location && !isNavigating) {
       fetchPlaces(location.latitude, location.longitude, selectedCategory);
     }
-  }, [location, selectedCategory, fetchPlaces]);
+  }, [location]);
 
-  // ---------------- AI DETAILS ----------------
+  // category change
   useEffect(() => {
-    setAiDetails(null);
-  }, [selectedPlace, setAiDetails]);
+    if (location && !isNavigating) {
+      fetchPlaces(location.latitude, location.longitude, selectedCategory);
+    }
+  }, [selectedCategory]);
 
-  // ---------------- LOADING ----------------
+  // 🧠 Reset AI when place changes
+  useEffect(() => {
+    if (!selectedPlace) {
+      setAiDetails(null);
+    }
+  }, [selectedPlace]);
+
+  // ⏳ Loading
   if (loading || !location) {
     return (
-      <View className="flex-1 justify-center items-center">
+      <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" />
+        <View className="">
+          <Text> Wait for a moment while fetching places nearby you </Text>
+        </View>
       </View>
     );
   }
 
-  // ---------------- ERROR ----------------
+  // ❌ Error
   if (error) {
     return (
       <View className="flex-1 justify-center items-center">
@@ -66,64 +113,63 @@ export default function Map() {
     );
   }
 
-  // ---------------- UI ----------------
-  return (
+  const selectedItineraryPlace =
+    itinerary.find(
+      p =>
+        p.place_id === selectedPlace?.place_id ||
+        p.name === selectedPlace?.name
+    );
 
+  return (
     <View className="flex-1">
 
-      {/* Top UI Overlay */}
-      <View className="absolute top-12 left-4 right-4 z-50 space-y-3 bg-white/70 p-3 rounded-xl">
+      {/* 🔝 TOP OVERLAY */}
+      <View className="absolute top-8 left-4 right-4 z-50 space-y-2">
 
-        <CategoryPicker
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-        />
-
-
-        <View className="flex-row justify-between">
-
-          <View className="flex-1 mr-2">
-            <PlanButton
-              loading={planLoading}
-              onPress={() =>
-                location &&
-                generateTrip(location.latitude, location.longitude)
-              }
+        {/* 🧭 Exploration Controls */}
+        {!isNavigating && (
+          <View className="bg-white/80 p-3 rounded-xl">
+            <CategoryPicker
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
             />
+
+            {places.length === 0 && (
+              <View className="mt-2 bg-orange-100 border border-orange-300 px-3 py-2 rounded-lg">
+                <Text className="text-orange-700 text-sm text-center">
+                  No places found for this category.
+                </Text>
+              </View>
+            )}
+
+            <View className="mt-2">
+              <PlanOwnButton
+                onPress={() => {
+                  router.push({
+                    pathname: "/plan-form",
+                    params: { places: JSON.stringify(places) },
+                  });
+                }}
+              />
+            </View>
           </View>
+        )}
 
-          {/* Custom Plan */}
-          <View className="flex-1 ml-2">
-            <PlanOwnButton
-              onPress={() => {
-                console.log("➡️ Navigating to Plan Form");
-                console.log("📦 Places passed:", places.length);
-
-                router.push({
-                  pathname: "/plan-form",
-                  params: {
-                    places: JSON.stringify(places),
-                  },
-                })
-              }}
-            />
+        {/* 📋 Itinerary (SCROLLABLE) */}
+        {itinerary.length > 0 && (
+          <View>
+            <ItineraryCard itinerary={itinerary} location={location} />
           </View>
-
-        </View>
-
-        <ItineraryCard
-          itinerary={itinerary}
-          onClear={() => setItinerary([])}
-        />
+        )}
 
       </View>
 
-      {/* Map */}
+      {/* 🗺️ MAP */}
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
-        mapPadding={{ top: 0, bottom: 0, left: 0, right: 0 }}
         showsUserLocation
+        onPress={() => setSelectedPlace(null)}
         initialRegion={{
           latitude: location.latitude,
           longitude: location.longitude,
@@ -132,31 +178,78 @@ export default function Map() {
         }}
       >
 
+        {/* 🔵 Route Line */}
+        {isNavigating && <RoutePolyline coordinates={routeCoords} />}
+
+        {/* 📍 Markers */}
         <MapMarkers
-          places={places}
+          places={isNavigating ? itineraryPlaces : places}
           selectedPlace={selectedPlace}
           setSelectedPlace={setSelectedPlace}
-          fetchAIDetails={fetchAIDetails}
+          fetchAIDetails={(place) => {
+            if (!place?.place_id) {
+              console.log("❌ Missing real place_id:", place);
+              return;
+            }
+            fetchAIDetails(place.place_id);
+          }}
         />
 
       </MapView>
 
-      {/* Bottom horizontal cards */}
-      <HorizontalPlacesList
-        places={places}
-        mapRef={mapRef}
-        setSelectedPlace={setSelectedPlace}
-        fetchAIDetails={fetchAIDetails}
-      />
+      {/* Show Place Details */}
+      {selectedPlace && !isNavigating && (
+        <PlaceDetailsCard
+          selectedPlace={selectedPlace}
+          aiDetails={aiDetails}
+          aiLoading={aiLoading}
+          setSelectedPlace={setSelectedPlace}
+          setAiDetails={setAiDetails}
+        />
+      )}
 
-      {/* Bottom AI details card */}
-      <PlaceDetailsCard
-        selectedPlace={selectedPlace}
-        aiDetails={aiDetails}
-        aiLoading={aiLoading}
-        setSelectedPlace={setSelectedPlace}
-        setAiDetails={setAiDetails}
-      />
+      {selectedPlace && isNavigating && selectedItineraryPlace && (
+        <NavigationPlaceCard place={selectedItineraryPlace} />
+      )}
+
+      {/* 📍 Location Pointer */}
+
+      {!isNavigating && (
+        <View className="absolute bottom-48 right-5 z-10">
+          <Pressable
+            onPress={() => {
+              if (!location) return;
+
+              mapRef.current?.animateToRegion({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
+              });
+            }}
+            className="bg-white p-3 rounded-full shadow-lg"
+          >
+            <Text>📍</Text>
+          </Pressable>
+        </View>
+
+      )}
+
+      {/* 📌 Horizontal List */}
+      {!isNavigating && (
+        <HorizontalPlacesList
+          places={places}
+          mapRef={mapRef}
+          setSelectedPlace={setSelectedPlace}
+          fetchAIDetails={(place) => {
+            if (!place?.place_id) {
+              console.log("❌ Missing real place_id:", place);
+              return;
+            }
+            fetchAIDetails(place.place_id);
+          }}
+        />
+      )}
 
     </View>
   );

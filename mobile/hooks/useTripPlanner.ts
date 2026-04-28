@@ -1,43 +1,52 @@
-import {useState} from "react"
-import {generatePlan} from "@/services/planService"
+import { useState } from "react";
+import { generatePlan } from "@/services/planService";
+import { useTrip } from "@/context/TripContext";
 
-export default function useTripPlanner(){
+export default function useTripPlanner() {
+  const [planLoading, setPlanLoading] = useState(false);
 
-  const [itinerary,setItinerary] = useState<any[]>([])
-  const [planLoading,setPlanLoading] = useState(false)
+  const { setTrip } = useTrip(); // 🔥 GLOBAL
 
-  const generateTrip = async(
-    lat:number,
-    lng:number
-  )=>{
+  
+  const generateTrip = async (
+    lat: number,
+    lng: number,
+    data: {
+      placeIds: string[];
+      categories: string[];
+      duration: number;
+    }
+  ) => {
+    try {
+      setPlanLoading(true);
 
-    try{
+      const response = await generatePlan({
+        lat,
+        lng,
+        duration: data.duration,
+        categories: data.categories,
+        placeIds: data.placeIds,
+      });
 
-      setPlanLoading(true)
-
-      const response =
-        await generatePlan(lat,lng,3)
-
-      if(response.success){
-        setItinerary(response.plan)
+      
+      if (response.success) {
+        // 🔥 PUSH INTO GLOBAL CONTEXT
+        setTrip({
+          itinerary: response.plan,
+          summary: response.summary || "",
+        });
       }
 
       console.log("Plan data:", response.plan);
+    } catch (err) {
+      console.log("Plan error:", err);
+    } finally {
+      setPlanLoading(false);
     }
-    catch(err){
-      console.log("Plan error:",err)
-    }
-    finally{
-      setPlanLoading(false)
-    }
+  };
 
-  }
-
-  return{
-    itinerary,
+  return {
     planLoading,
     generateTrip,
-    setItinerary
-  }
-
+  };
 }

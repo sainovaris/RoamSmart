@@ -1,31 +1,47 @@
-import {useState,useEffect} from "react"
-import * as Location from "expo-location"
-import type {LocationObjectCoords} from "expo-location"
+import { useState, useEffect } from "react";
+import * as Location from "expo-location";
+import type { LocationObjectCoords } from "expo-location";
 
-export default function useCurrentLocation(){
+export default function useCurrentLocation() {
+  const [location, setLocation] = useState<LocationObjectCoords | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [location,setLocation] = useState<LocationObjectCoords|null>(null)
-  const [error,setError] = useState<string|null>(null)
+  useEffect(() => {
+    const load = async () => {
+      console.log("📍 Requesting location...");
 
-  useEffect(()=>{
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
 
-    const load = async ()=>{
+      console.log("📍 Permission:", status);
 
-      const {status} =
-        await Location.requestForegroundPermissionsAsync()
-
-      if(status!=="granted"){
-        setError("Location permission denied")
-        return
+      if (status !== "granted") {
+        setError("Location permission denied");
+        return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({})
-      setLocation(loc.coords)
-    }
+      try {
+        const last = await Location.getLastKnownPositionAsync();
+        if (last) {
+          console.log("⚡ Using last known location");
+          setLocation(last.coords);
+        }
 
-    load()
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
 
-  },[])
+        console.log("🎯 Accurate location fetched");
+        setLocation(loc.coords);
 
-  return {location,error}
+      } catch (err: any) {
+        console.log("❌ Location error:", err.message);
+        setError("Failed to fetch location");
+      }
+    };
+
+    load();
+  }, []);
+
+  return { location, error };
 }

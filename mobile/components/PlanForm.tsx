@@ -6,39 +6,23 @@ type Props = {
   places: Place[];
   onSubmit: (data: {
     placeIds: string[];
-    categories: string[];
     duration: number;
   }) => void;
 };
 
-const CATEGORY_OPTIONS = ["Food", "Nature", "Culture", "Stay", "Entertainment"];
-
 export default function PlanForm({ places, onSubmit }: Props) {
   const [successMsg, setSuccessMsg] = useState("");
   const [selectedPlaces, setSelectedPlaces] = useState<string[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [duration, setDuration] = useState("");
 
   // console.log(places)
 
-  const togglePlace = (id: string) => {
+  const togglePlace = (placeId: string) => {
     setSelectedPlaces((prev) => {
-      const updated = prev.includes(id)
-        ? prev.filter((p) => p !== id)
-        : [...prev, id];
+      const updated = prev.includes(placeId)
+        ? prev.filter((p) => p !== placeId)
+        : [...prev, placeId];
 
-      console.log("📍 Updated Selected Places:", updated);
-      return updated;
-    });
-  };
-
-  const toggleCategory = (cat: string) => {
-    setCategories((prev) => {
-      const updated = prev.includes(cat)
-        ? prev.filter((c) => c !== cat)
-        : [...prev, cat];
-
-      console.log("📂 Updated Categories:", updated);
       return updated;
     });
   };
@@ -48,22 +32,18 @@ export default function PlanForm({ places, onSubmit }: Props) {
 
     const payload = {
       placeIds: selectedPlaces,
-      categories,
       duration: Number(duration),
     };
 
     console.log("🚀 SUBMIT CLICKED");
-    console.log("📦 Final Payload:", payload);
 
     onSubmit(payload);
 
-    // ✅ Reset all fields
     setSelectedPlaces([]);
-    setCategories([]);
     setDuration("");
 
     // ✅ Show success message
-    setSuccessMsg("Your request is made, thanks");
+    setSuccessMsg("Wait for a moment, you're redirecting to your itinerary plan");
   };
 
 
@@ -89,12 +69,12 @@ export default function PlanForm({ places, onSubmit }: Props) {
               {places.length > 0 ?
                 (
                   places.map((place) => {
-                    const isSelected = selectedPlaces.includes(place.id);
+                    const isSelected = selectedPlaces.includes(place.place_id);
 
                     return (
                       <View key={place.id}>
                         <Pressable
-                          onPress={() => togglePlace(place.id)}
+                          onPress={() => togglePlace(place.place_id)}
                           className="mt-3 py-2 rounded-md"
                           style={{
                             backgroundColor: isSelected ? "#d05203" : "#f3f4f6",
@@ -119,38 +99,6 @@ export default function PlanForm({ places, onSubmit }: Props) {
               }
             </View>
           </ScrollView>
-
-        </View>
-
-
-        {/* Categories */}
-        <View className="p-3">
-          <Text className="font-semibold mt-3 mb-2">Select Categories</Text>
-
-          <View className="flex-row flex-wrap w-full">
-            {CATEGORY_OPTIONS.map((cat) => {
-              const isSelected = categories.includes(cat);
-
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => toggleCategory(cat)}
-                  className="mr-2 mb-2 px-3 py-2 rounded-md"
-                  style={{
-                    backgroundColor: isSelected ? "#d05203" : "#f3f4f6",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: isSelected ? "#ffffff" : "#111827",
-                    }}
-                  >
-                    {cat}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
 
         </View>
 

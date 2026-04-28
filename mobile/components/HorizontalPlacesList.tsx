@@ -1,12 +1,13 @@
 import { ScrollView, Pressable, Text, View } from "react-native";
 import MapView from "react-native-maps";
 import { Place } from "@/types/place";
+// import { useTrip } from "@/context/TripContext";
 
 type Props = {
   places: Place[];
   mapRef: React.RefObject<MapView | null>;
   setSelectedPlace: React.Dispatch<React.SetStateAction<Place | null>>;
-  fetchAIDetails: (id: string) => void;
+  fetchAIDetails: (place: Place) => void;
 };
 
 export default function HorizontalPlacesList({
@@ -15,19 +16,23 @@ export default function HorizontalPlacesList({
   setSelectedPlace,
   fetchAIDetails,
 }: Props) {
+  // const { isNavigating } = useTrip();
+
   return (
     <View className="absolute bottom-5 left-5 right-5 pb-2">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {places.map((place) => (
           <Pressable
             key={place.id}
             className="bg-white rounded-xl shadow-md mr-3 p-3 w-56"
             onPress={() => {
-
-              setSelectedPlace(place);
+              setSelectedPlace((prev) => {
+                // avoid redundant state + API call
+                if (prev?.id !== place.id) {
+                  fetchAIDetails(place);
+                }
+                return place;
+              });
 
               mapRef.current?.animateToRegion(
                 {
@@ -36,15 +41,16 @@ export default function HorizontalPlacesList({
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 },
-                500
+                400
               );
-
-              fetchAIDetails(place.id);
             }}
           >
-
             {/* Name */}
-            <Text className="font-semibold text-base">
+            <Text
+              className="font-semibold text-base"
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
               {place.name}
             </Text>
 
@@ -61,14 +67,11 @@ export default function HorizontalPlacesList({
             {/* Open / Closed */}
             <Text
               className={`mt-1 font-medium ${
-                place.open_now
-                  ? "text-green-600"
-                  : "text-red-500"
+                place.open_now ? "text-green-600" : "text-red-500"
               }`}
             >
               {place.open_now ? "Open Now" : "Closed"}
             </Text>
-
           </Pressable>
         ))}
       </ScrollView>
