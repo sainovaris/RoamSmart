@@ -25,16 +25,25 @@ function parseDuration(durationStr) {
 // ================= NORMALIZE DB PLACE =================
 function normalizeDBPlace(p) {
   const { category, subcategory } = classifyPlace(p.types || []);
+
+  let lat = null;
+  let lng = null;
+
+  if (p?.location?.coordinates) {
+    lng = p.location.coordinates[0];
+    lat = p.location.coordinates[1];
+  }
+
   return {
     place_id: p.place_id,
     name: p.name,
     category,
     subcategory,
     types: p.types,
-    location: {
-      lat: p.location.coordinates[1],
-      lng: p.location.coordinates[0],
-    },
+
+    // ✅ ALWAYS normalized
+    location: { lat, lng },
+
     address: p.address,
     is_open: p.is_open,
     rating: p.rating,
@@ -253,13 +262,11 @@ exports.getNearbyForSelection = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ getNearbyForSelection Error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch nearby places",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch nearby places",
+      error: error.message,
+    });
   }
 };
 
@@ -376,12 +383,28 @@ exports.generateCustomItinerary = async (req, res) => {
         videos = rankVideos(rawVideos, place.name);
       } catch {}
 
+      if (place?.location?.lat == null || place?.location?.lng == null) {
+        console.log("❌ Skipping place (no coords):", place.name);
+        continue;
+      }
+
+      console.log("📍 Place coords:", {
+        name: place.name,
+        lat: place.location?.lat,
+        lng: place.location?.lng,
+      });
+
       itinerary.push({
         step: itinerary.length + 1,
         place_id: place.place_id,
         name: place.name,
         category: place.category,
         subcategory: place.subcategory,
+
+        // ✅ FIXED
+        latitude: place.location.lat,
+        longitude: place.location.lng,
+
         address: place.address,
         location: place.location,
         duration_minutes: duration,
@@ -390,6 +413,8 @@ exports.generateCustomItinerary = async (req, res) => {
         ai_details: place.ai_details,
         videos,
       });
+
+      console.log("🚀 Sending place_id:", place.place_id);
     }
 
     console.log("📋 Final custom itinerary:", itinerary.length, "places");

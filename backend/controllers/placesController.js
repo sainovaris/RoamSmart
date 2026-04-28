@@ -21,6 +21,7 @@ async function findNearbyPlaces(lat, lng) {
 
 exports.testInsert = async (req, res) => {
   try {
+    lp;
     const testPlace = {
       name: "Test Place Amisha",
       rating: 4.5,

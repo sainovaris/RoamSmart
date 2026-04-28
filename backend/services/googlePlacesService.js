@@ -1,84 +1,129 @@
 const axios = require("axios");
 
-// Maps our category names to Google Places keyword
-const categoryToKeyword = {
+// ✅ VALID Google Place types mapping
+const categoryToType = {
   food: "restaurant",
-  entertainment: "entertainment",
-  culture: "tourist attraction",
+  entertainment: "amusement_park",
+  culture: "tourist_attraction",
   nature: "park",
-  stay: "hotel",
-  shopping: "shopping mall",
+  stay: "lodging",
+  shopping: "shopping_mall",
   wellness: "spa",
 };
 
-exports.fetchNearbyFromGoogle = async (lat, lng, type, radius = 5000) => {
+const MAX_PER_CATEGORY = 10;
+
+const GOOGLE_BASE = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
+
+// 🔁 Helper to fetch one page
+async function fetchPage(url) {
+  const response = await axios.get(url);
+  return response.data;
+}
+
+// 🔁 Fetch multiple pages (max 3 pages = ~60 results)
+async function fetchWithPagination(baseUrl) {
+  let allResults = [];
+  let nextPageToken = null;
+
+  for (let i = 0; i < 3; i++) {
+    let url = baseUrl;
+
+    if (nextPageToken) {
+      url += `&pagetoken=${nextPageToken}`;
+      await new Promise((r) => setTimeout(r, 2000)); // required delay
+    }
+
+    const data = await fetchPage(url);
+
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+      console.log("Google API Status:", data.status);
+      break;
+    }
+
+    allResults = [...allResults, ...(data.results || [])];
+
+    if (!data.next_page_token) break;
+    nextPageToken = data.next_page_token;
+  }
+
+  return allResults;
+}
+
+// =============================
+// MAIN FUNCTION
+// =============================
+exports.fetchNearbyFromGoogle = async (lat, lng, type, radius = 10000) => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
 
-  // If type is an array of categories (from planController),
-  // map to Google-friendly keywords and make one call per category
+  const seenIds = new Set();
+  let allPlaces = [];
+
+  // =============================
+  // MULTI CATEGORY CASE
+  // =============================
   if (Array.isArray(type) && type.length > 0) {
-    const allPlaces = [];
-    const seenIds = new Set();
-
     for (const cat of type) {
-      const keyword = categoryToKeyword[cat.toLowerCase()] || cat;
+      const mappedType = categoryToType[cat.toLowerCase()] || "tourist_attraction";
 
-      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=${apiKey}`;
+      const url = `${GOOGLE_BASE}?location=${lat},${lng}&radius=${radius}&type=${mappedType}&key=${apiKey}`;
 
       try {
-        const response = await axios.get(url);
-        console.log(
-          `Google API Status for "${keyword}":`,
-          response.data.status,
-        );
+        let results = await fetchWithPagination(url);
 
-        const places = response.data.results.map((place) => ({
-          place_id: place.place_id || null,
-          name: place.name,
-          rating: place.rating || 0,
-          user_ratings_total: place.user_ratings_total || 0,
-          types: place.types || [],
-          is_open: place.opening_hours?.open_now ?? "Unknown",
-          location: {
-            lat: place.geometry?.location?.lat || null,
-            lng: place.geometry?.location?.lng || null,
-          },
-          address: place.vicinity || "",
-          photo:
-            place.photos && place.photos.length > 0
-              ? exports.getPhotoUrl(place.photos[0].photo_reference)
-              : null,
-        }));
+        // 🔥 limit per category (IMPORTANT)
+        const MAX_PER_CATEGORY = 10;
+        results = results.slice(0, MAX_PER_CATEGORY);
 
-        // Deduplicate across categories
-        for (const place of places) {
-          if (place.place_id && !seenIds.has(place.place_id)) {
-            seenIds.add(place.place_id);
-            allPlaces.push(place);
-          }
+        console.log(`Google API (${mappedType}) →`, results.length);
+
+        for (const place of results) {
+          if (!place.place_id || seenIds.has(place.place_id)) continue;
+
+          seenIds.add(place.place_id);
+
+          allPlaces.push({
+            place_id: place.place_id,
+            name: place.name,
+            rating: place.rating || 0,
+            user_ratings_total: place.user_ratings_total || 0,
+            types: place.types || [],
+            is_open: place.opening_hours?.open_now ?? "Unknown",
+            location: {
+              lat: place.geometry?.location?.lat || null,
+              lng: place.geometry?.location?.lng || null,
+            },
+            address: place.vicinity || "",
+            photo:
+              place.photos && place.photos.length > 0
+                ? exports.getPhotoUrl(place.photos[0].photo_reference)
+                : null,
+          });
         }
       } catch (err) {
-        console.error(
-          `Google API error for keyword "${keyword}":`,
-          err.message,
-        );
+        console.error(`Google API error (${mappedType}):`, err.message);
       }
     }
 
-    console.log("Returning total no of places from Google:", allPlaces.length);
+    console.log("✅ Total merged places:", allPlaces.length);
     return allPlaces;
   }
 
-  // Single type/keyword call (used by restaurantController, placesController etc.)
-  const searchType = type || "tourist_attraction";
-  const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(searchType)}&key=${apiKey}`;
+  // =============================
+  // SINGLE TYPE CASE
+  // =============================
+  const mappedType =
+    categoryToType[type?.toLowerCase()] || "tourist_attraction";
+
+  const url = `${GOOGLE_BASE}?location=${lat},${lng}&radius=${radius}&type=${mappedType}&key=${apiKey}`;
 
   try {
-    const response = await axios.get(url);
-    console.log("Google API Status:", response.data.status);
+    const results = await fetchWithPagination(url);
 
-    const places = response.data.results.slice(0, 25).map((place) => ({
-      place_id: place.place_id || null,
+    console.log("Google API (single) →", results.length);
+
+    return results.map((place) => ({
+      place_id: place.place_id,
       name: place.name,
       rating: place.rating || 0,
       user_ratings_total: place.user_ratings_total || 0,
@@ -94,22 +139,23 @@ exports.fetchNearbyFromGoogle = async (lat, lng, type, radius = 5000) => {
           ? exports.getPhotoUrl(place.photos[0].photo_reference)
           : null,
     }));
-
-    console.log("Returning total no of places from Google:", places.length);
-    return places;
   } catch (error) {
-    console.error("Axios Error:", error.message);
+    console.error("Google API Error:", error.message);
     throw error;
   }
 };
 
+// =============================
+// PLACE DETAILS
+// =============================
 exports.getPlaceDetailsFromGoogle = async (placeId) => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
 
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,formatted_address,formatted_phone_number,opening_hours,photos,website,reviews,geometry&key=${apiKey}`;
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,formatted_address,opening_hours,photos,geometry,types,user_ratings_total&key=${apiKey}`;
 
   try {
     const response = await axios.get(url);
+
     console.log("Google Details API Status:", response.data.status);
 
     if (response.data.status !== "OK") {
@@ -123,7 +169,11 @@ exports.getPlaceDetailsFromGoogle = async (placeId) => {
   }
 };
 
+// =============================
+// PHOTO
+// =============================
 exports.getPhotoUrl = (photoReference) => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
 };
