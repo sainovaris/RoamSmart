@@ -3,7 +3,7 @@ import { fetchNearbyPlaces } from "@/services/placesService"
 import { calculateDistance } from "@/utils/distance"
 import { Place } from "@/types/place"
 
-export default function usePlaces() {
+export default function usePlaces(setServerDown?: (v: boolean) => void){
 
   const [places, setPlaces] = useState<Place[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,8 +50,18 @@ export default function usePlaces() {
 
         setPlaces(formatted)
 
-      } catch (err) {
-        console.log("Places error:", err)
+      } catch (err: any) {
+        console.log("❌ Places API error:", err?.message);
+
+        // 🚨 Detect Render sleep / backend down
+        if (
+          !err.response || // network error
+          err.code === "ECONNABORTED" ||
+          err.message?.includes("Network Error") ||
+          err.response?.status >= 500
+        ) {
+          setServerDown?.(true);
+        }
       }
       finally {
         setLoading(false)

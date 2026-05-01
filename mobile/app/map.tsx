@@ -24,8 +24,8 @@ import RoutePolyline from "@/components/RoutePolyline";
 import useVoiceGuide from "@/hooks/useVoiceGuide";
 
 
-const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
-// const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
+// const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
+const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
 
 
 export default function Map() {
@@ -35,13 +35,14 @@ export default function Map() {
 
   const { location, error } = useCurrentLocation();
   const { itinerary, isNavigating, routeCoords } = useTrip();
+  const [serverDown, setServerDown] = useState(false);
 
   useVoiceGuide(isNavigating ? location : null);
 
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const { places, loading, fetchPlaces } = usePlaces();
+  const { places, loading, fetchPlaces } = usePlaces(setServerDown);
   const { aiDetails, aiLoading, fetchAIDetails, setAiDetails } = useAI();
 
   const { resetTrip } = useTrip();
@@ -92,7 +93,7 @@ export default function Map() {
   // ⏳ Loading
   if (loading || !location) {
     console.log("API URL at MAP.tsx:", BASE_API_URL);
-  
+
     return (
       <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" />
@@ -112,12 +113,14 @@ export default function Map() {
     );
   }
 
+
   const selectedItineraryPlace =
     itinerary.find(
       p =>
         p.place_id === selectedPlace?.place_id ||
         p.name === selectedPlace?.name
     );
+
 
   return (
     <View className="flex-1">
@@ -136,7 +139,7 @@ export default function Map() {
             {places.length === 0 && (
               <View className="mt-2 bg-orange-100 border border-orange-300 px-3 py-2 rounded-lg">
                 <Text className="text-orange-700 text-sm text-center">
-                  No places found for this category.
+                  No places found for this category,
                 </Text>
               </View>
             )}
@@ -248,6 +251,27 @@ export default function Map() {
             fetchAIDetails(place.place_id);
           }}
         />
+      )}
+
+
+      {serverDown && (
+        <View className="absolute inset-0 bg-black/40 justify-center items-center z-50">
+          <View className="bg-white p-5 rounded-xl w-[80%] items-center">
+            <Text className="text-lg font-semibold text-center mb-2">
+              🚀 Server is waking up
+            </Text>
+            <Text className="text-sm text-gray-600 text-center mb-4">
+              Please try again in a few minutes.
+            </Text>
+
+            <Pressable
+              onPress={() => setServerDown(false)}
+              className="bg-black px-4 py-2 rounded-lg"
+            >
+              <Text className="text-white">OK</Text>
+            </Pressable>
+          </View>
+        </View>
       )}
 
     </View>
