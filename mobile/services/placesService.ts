@@ -8,6 +8,7 @@ export const getNearbyPlaces = async (lat: number, lng: number) => {
     },
   });
 
+  console.log("----\nRequesting at: ", api.defaults.baseURL + '/nearby' + '\n---------')
   console.log("Nearby places response count:", response.data["count"]);
   return response.data;
 };
@@ -26,6 +27,7 @@ export const fetchNearbyPlaces = async (
     }
   });
 
+  console.log("----\nRequesting at: ", api.defaults.baseURL + '/google-nearby' + '\n----------')
   console.log(`Google Nearby places response count for ${category}: ${response.data["count"]}`);
   return response.data;
 };

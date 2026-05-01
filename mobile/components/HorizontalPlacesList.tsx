@@ -28,7 +28,7 @@ export default function HorizontalPlacesList({
             onPress={() => {
               setSelectedPlace((prev) => {
                 // avoid redundant state + API call
-                if (prev?.id !== place.id) {
+                if (prev?.place_id !== place.place_id){
                   fetchAIDetails(place);
                 }
                 return place;

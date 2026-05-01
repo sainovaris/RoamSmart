@@ -24,12 +24,11 @@ import RoutePolyline from "@/components/RoutePolyline";
 import useVoiceGuide from "@/hooks/useVoiceGuide";
 
 
-const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
-// const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
+// const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
+const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
 
 
 export default function Map() {
-  console.log("API URL at MAP.tsx:", BASE_API_URL);
 
   const mapRef = useRef<MapView | null>(null);
   const router = useRouter();
@@ -94,6 +93,8 @@ export default function Map() {
 
   // ⏳ Loading
   if (loading || !location) {
+    console.log("API URL at MAP.tsx:", BASE_API_URL);
+  
     return (
       <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" />

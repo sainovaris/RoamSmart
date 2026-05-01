@@ -21,6 +21,7 @@ export const generatePlan = async ({
     place_ids: placeIds,
   });
 
+  console.log("----\nRequesting at: ", api.defaults.baseURL + '/plan/custom' + '\n----------')
   console.log("Plan generation response:", response.data);
   return response.data;
 };

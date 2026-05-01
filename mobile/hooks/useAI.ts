@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { api } from "@/services/api";
+import { getAIDetails } from "@/services/aiService";
 import { AIDetails, Place } from "@/types/place";
 
 export default function useAI() {
@@ -15,7 +15,7 @@ export default function useAI() {
   const resolveId = (input?: string | Place): string | null => {
     if (!input) return null;
     if (typeof input === "string") return input;
-    return input.id || input.place_id || null;
+    return input.place_id || input.id || null;
   };
 
   const fetchAIDetails = async (input?: string | Place) => {
@@ -35,30 +35,31 @@ export default function useAI() {
 
     const reqId = ++activeReqId.current;
 
+    console.log("📡 Calling AI for:", placeId);
+
     try {
       setAiLoading(true);
 
-      const response = await api.get(`/ai/${placeId}`);
+      const data = await getAIDetails(placeId);
 
-      // 🛑 ignore stale responses
       if (reqId !== activeReqId.current) return;
 
-      if (response?.data?.success && response?.data?.data) {
-        const data: AIDetails = response.data.data;
+      cacheRef.current.set(placeId, data);
+      setAiDetails(data);
 
-        cacheRef.current.set(placeId, data);
-        setAiDetails(data);
-      } else {
-        console.log("⚠️ Invalid AI response:", response?.data);
-      }
-    } catch (err: unknown) {
+    } 
+    catch (err: unknown) {
       const message =
         typeof err === "object" && err && "message" in err
           ? (err as { message: string }).message
           : "Unknown error";
-      console.log("❌ AI error:", message);
-    } finally {
-      // 🛑 only clear loading if this is the latest request
+      if (typeof err === "object" && err && "response" in err) {
+        console.log("❌ AI ERROR RESPONSE:", (err as any).response?.data);
+      } else {
+        console.log("❌ AI error:", message);
+      }
+    } 
+    finally {
       if (reqId === activeReqId.current) {
         setAiLoading(false);
       }

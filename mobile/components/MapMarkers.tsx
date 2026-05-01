@@ -33,7 +33,7 @@ export default function MapMarkers({
             title={place.name}
             pinColor={
               isCurrentStep
-                ? "green"       // 🟢 current navigation step
+                ? "green"         // 🟢 current navigation step
                 : isSelected
                   ? "orange"      // 🟠 selected
                   : "red"         // 🔴 default
@@ -41,7 +41,7 @@ export default function MapMarkers({
             onPress={(e) => {
               e.stopPropagation(); // 🔥 IMPORTANT FIX
 
-              if (selectedPlace?.id !== place.id) {
+              if (selectedPlace?.place_id !== place.place_id) {
                 setSelectedPlace(place);
 
                 if (!isNavigating) {

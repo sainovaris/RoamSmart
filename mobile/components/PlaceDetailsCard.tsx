@@ -49,7 +49,7 @@ export default function PlaceDetailsCard({
     setIsSpeaking(true);
   };
 
-  console.log("Selectef Place: ", selectedPlace.name)
+  console.log("Selected Place: ", selectedPlace.name)
   return (
     <View className="absolute bottom-48 left-5 right-5 bg-white p-4 rounded-2xl shadow-xl z-40">
       <ScrollView>

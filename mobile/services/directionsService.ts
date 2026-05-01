@@ -23,5 +23,7 @@ export const getRouteFromBackend = async (origin: any, places: any[]) => {
     places,
   });
 
+  console.log("----\nRequesting at: ", api.defaults.baseURL + '/route' + '\n----')
+
   return res.data.data;
 };
