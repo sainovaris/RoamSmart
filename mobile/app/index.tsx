@@ -1,5 +1,7 @@
 import { Link } from "expo-router";
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable, Image,LogBox } from "react-native";
+
+LogBox.ignoreLogs(["Unable to activate keep awake"]);
 
 export default function Index() {
   console.log("App loaded");

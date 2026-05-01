@@ -24,8 +24,8 @@ import RoutePolyline from "@/components/RoutePolyline";
 import useVoiceGuide from "@/hooks/useVoiceGuide";
 
 
-// const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
-const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
+const BASE_API_URL = `http://${process.env.EXPO_PUBLIC_IPV4_ADDR}:5000/api`;
+// const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
 
 
 export default function Map() {
@@ -34,9 +34,7 @@ export default function Map() {
   const router = useRouter();
 
   const { location, error } = useCurrentLocation();
-  const { itinerary, isNavigating, routeCoords, currentStepIndex } = useTrip();
-
-  const currentPlace = itinerary[currentStepIndex];
+  const { itinerary, isNavigating, routeCoords } = useTrip();
 
   useVoiceGuide(isNavigating ? location : null);
 
