@@ -1,10 +1,11 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 
-import { View, ActivityIndicator, Text, Pressable } from "react-native";
+import { View, ActivityIndicator, Text, Pressable, Modal, BackHandler } from "react-native";
 import MapView from "react-native-maps";
 import PlanOwnButton from "@/components/PlanOwnButton";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router"
+  ;
 
 import useCurrentLocation from "@/hooks/useCurrentLocation";
 import usePlaces from "@/hooks/usePlaces";
@@ -36,6 +37,7 @@ export default function Map() {
   const { location, error } = useCurrentLocation();
   const { itinerary, isNavigating, routeCoords } = useTrip();
   const [serverDown, setServerDown] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
 
   useVoiceGuide(isNavigating ? location : null);
 
@@ -90,6 +92,24 @@ export default function Map() {
     }
   }, [selectedPlace]);
 
+  // Back Handling while navigation
+  useEffect(() => {
+    const backAction = () => {
+      if (isNavigating) {
+        setConfirmExit(true);
+        return true; // 🔥 prevent default back
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [isNavigating]);
+
   // ⏳ Loading
   if (loading || !location) {
     console.log("API URL at MAP.tsx:", BASE_API_URL);
@@ -139,7 +159,7 @@ export default function Map() {
             {places.length === 0 && (
               <View className="mt-2 bg-orange-100 border border-orange-300 px-3 py-2 rounded-lg">
                 <Text className="text-orange-700 text-sm text-center">
-                  No places found for this category,
+                  No places found from Google for this category,
                 </Text>
               </View>
             )}
@@ -254,25 +274,84 @@ export default function Map() {
       )}
 
 
-      {serverDown && (
-        <View className="absolute inset-0 bg-black/40 justify-center items-center z-50">
-          <View className="bg-white p-5 rounded-xl w-[80%] items-center">
+      <Modal
+        visible={serverDown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setServerDown(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/40">
+
+          <View className="bg-white p-5 rounded-xl w-[80%] items-center shadow-lg">
             <Text className="text-lg font-semibold text-center mb-2">
               🚀 Server is waking up
             </Text>
+
             <Text className="text-sm text-gray-600 text-center mb-4">
               Please try again in a few minutes.
             </Text>
 
             <Pressable
-              onPress={() => setServerDown(false)}
+              onPress={() => {
+                setServerDown(false);
+                if (location) {
+                  fetchPlaces(location.latitude, location.longitude, selectedCategory);
+                }
+              }}
               className="bg-black px-4 py-2 rounded-lg"
             >
               <Text className="text-white">OK</Text>
             </Pressable>
           </View>
+
         </View>
-      )}
+      </Modal>
+
+
+      <Modal
+        visible={confirmExit}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmExit(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/40">
+
+          <View className="bg-white p-5 rounded-xl w-[80%] items-center shadow-lg">
+
+            <Text className="text-lg font-semibold text-center mb-2">
+              End Trip?
+            </Text>
+
+            <Text className="text-sm text-gray-600 text-center mb-4">
+              You are currently navigating. Do you want to end the trip and go back?
+            </Text>
+
+            <View className="flex-row gap-3">
+
+              <Pressable
+                onPress={() => setConfirmExit(false)}
+                className="bg-gray-300 px-4 py-2 rounded-lg"
+              >
+                <Text className="text-black">Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setConfirmExit(false);
+                  resetTrip();
+                  router.back();
+                }}
+                className="bg-[#5b2805] px-4 py-2 rounded-lg"
+              >
+                <Text className="text-white">End Trip</Text>
+              </Pressable>
+
+            </View>
+
+          </View>
+
+        </View>
+      </Modal>
 
     </View>
   );

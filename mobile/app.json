@@ -19,7 +19,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/apps-imgs/bindaas-logo.png"
+        "foregroundImage": "./assets/apps-imgs/bindaas-logo-redefined.png"
       },
       "config": {
         "googleMaps": {
