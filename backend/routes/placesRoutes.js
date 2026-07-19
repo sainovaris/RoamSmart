@@ -4,8 +4,7 @@ const placesController = require("../controllers/placesController");
 
 router.get("/places", placesController.getAllPlaces);
 router.get("/nearby", placesController.getNearbyPlaces);
-router.get("/test-insert", placesController.testInsert);
 router.get("/google-nearby", placesController.getRealNearbyPlaces);
-router.get("/details/:placeId", placesController.getPlaceDetails); // ← ADD THIS
+router.get("/details/:placeId", placesController.getPlaceDetails);
 
 module.exports = router;

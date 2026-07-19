@@ -7,6 +7,7 @@ export default function usePlaces(setServerDown?: (v: boolean) => void){
 
   const [places, setPlaces] = useState<Place[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchPlaces = useCallback(
     async (latitude: number, longitude: number, category: string) => {
@@ -14,6 +15,8 @@ export default function usePlaces(setServerDown?: (v: boolean) => void){
       try {
 
         setLoading(true)
+        setError(null)
+        setServerDown?.(false)
 
         const response = await fetchNearbyPlaces(
           latitude,
@@ -21,8 +24,10 @@ export default function usePlaces(setServerDown?: (v: boolean) => void){
           category
         )
 
+        const raw = response?.results || response?.data || response?.places || []
+
         const formatted: Place[] =
-          response.results
+          raw
             .filter((p: any) => p.location?.lat !== undefined && p.location?.lng !== undefined)
             .map((p: any) => {
 
@@ -30,7 +35,7 @@ export default function usePlaces(setServerDown?: (v: boolean) => void){
               const lng = p.location.lng
 
               return {
-                id: p._id || p.place_id,   // 🔥 FIX
+                id: p._id || p.place_id,
                 place_id: p.place_id,
                 name: p.name,
                 rating: p.rating || 0,
@@ -52,10 +57,11 @@ export default function usePlaces(setServerDown?: (v: boolean) => void){
 
       } catch (err: any) {
         console.log("❌ Places API error:", err?.message);
+        setPlaces([])
+        setError(err?.message || "Failed to load places")
 
-        // 🚨 Detect Render sleep / backend down
         if (
-          !err.response || // network error
+          !err.response ||
           err.code === "ECONNABORTED" ||
           err.message?.includes("Network Error") ||
           err.response?.status >= 500
@@ -67,7 +73,7 @@ export default function usePlaces(setServerDown?: (v: boolean) => void){
         setLoading(false)
       }
 
-    }, [])
+    }, [setServerDown])
 
-  return { places, loading, fetchPlaces }
+  return { places, loading, error, fetchPlaces }
 }

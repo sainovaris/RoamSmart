@@ -23,13 +23,13 @@
       },
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyA-mkYl1V_p47h7UeaE6o1O6_Nv8qy3WC4"
+          "apiKey": ""
         }
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ],
       "package": "com.anonymous.mobile"

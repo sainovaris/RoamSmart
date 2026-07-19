@@ -1,11 +1,11 @@
 import { ScrollView, Pressable, Text, View } from "react-native";
-import MapView from "react-native-maps";
+import type { MapViewHandle } from "@/components/MapView";
 import { Place } from "@/types/place";
 // import { useTrip } from "@/context/TripContext";
 
 type Props = {
   places: Place[];
-  mapRef: React.RefObject<MapView | null>;
+  mapRef: React.RefObject<MapViewHandle | null>;
   setSelectedPlace: React.Dispatch<React.SetStateAction<Place | null>>;
   fetchAIDetails: (place: Place) => void;
 };

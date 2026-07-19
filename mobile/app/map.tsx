@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
 import { View, ActivityIndicator, Text, Pressable, Modal, BackHandler } from "react-native";
-import MapView from "react-native-maps";
+import MapView, { type MapViewHandle } from "@/components/MapView";
 import PlanOwnButton from "@/components/PlanOwnButton";
 import { useRouter, useFocusEffect } from "expo-router"
   ;
@@ -31,7 +31,7 @@ const BASE_API_URL = `${process.env.EXPO_PUBLIC_BACK}api`;
 
 export default function Map() {
 
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<MapViewHandle | null>(null);
   const router = useRouter();
 
   const { location, error } = useCurrentLocation();
@@ -110,25 +110,42 @@ export default function Map() {
     return () => backHandler.remove();
   }, [isNavigating]);
 
-  // ⏳ Loading
-  if (loading || !location) {
-    console.log("API URL at MAP.tsx:", BASE_API_URL);
-
+  // ❌ Location / permission error (check before loading spinner)
+  if (error) {
     return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <ActivityIndicator size="large" />
-        <View className="">
-          <Text> Wait for a moment while fetching places nearby you </Text>
-        </View>
+      <View className="flex-1 justify-center items-center px-6">
+        <Text className="text-lg font-semibold text-center mb-2">
+          Location needed
+        </Text>
+        <Text className="text-center text-gray-600 mb-4">{error}</Text>
+        <Text className="text-center text-gray-500 text-sm">
+          Enable location permission for Bindaas in Settings, then reopen the map.
+        </Text>
+        <Pressable
+          className="mt-6 bg-[#d05203] px-5 py-3 rounded-xl"
+          onPress={() => router.replace("/")}
+        >
+          <Text className="text-white font-semibold">Back to home</Text>
+        </Pressable>
       </View>
     );
   }
 
-  // ❌ Error
-  if (error) {
+  // ⏳ Loading location or places
+  if (!location || loading) {
+    console.log("API URL at MAP.tsx:", BASE_API_URL);
+
     return (
-      <View className="flex-1 justify-center items-center">
-        <Text>{error}</Text>
+      <View className="flex-1 justify-center items-center gap-3 px-6">
+        <ActivityIndicator size="large" />
+        <Text className="text-center">
+          {!location
+            ? "Getting your location…"
+            : "Fetching places near you…"}
+        </Text>
+        <Text className="text-center text-gray-500 text-sm">
+          First load after idle may take up to ~30s while the backend wakes up.
+        </Text>
       </View>
     );
   }

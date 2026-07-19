@@ -45,4 +45,6 @@ app-example
 /ios
 /android
 
-/data
+# local scratch (keep fixtures in /data tracked via -f if needed)
+# /data
+
