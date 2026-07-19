@@ -134,12 +134,14 @@ exports.getRealNearbyPlaces = async (req, res) => {
 
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
+    const requestedCategory = category || type || "";
 
     // ===== STEP 1: Google API =====
+    // Mobile sends `category` (e.g. Food). Map that for Google place types.
     const googleResults = await googleService.fetchNearbyFromGoogle(
       latitude,
       longitude,
-      type,
+      requestedCategory || undefined,
     );
 
     // ===== STEP 2: Clean Data =====
@@ -156,7 +158,7 @@ exports.getRealNearbyPlaces = async (req, res) => {
           types: place.types || [],
           category: cat,
           subcategory,
-          is_open: typeof place.is_open === "boolean" ? place.is_open : false,
+          is_open: typeof place.is_open === "boolean" ? place.is_open : true,
           photo: place.photo || null,
           photo_reference: null,
           location: {

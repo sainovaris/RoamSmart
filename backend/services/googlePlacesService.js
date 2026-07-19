@@ -37,8 +37,11 @@ async function fetchWithPagination(baseUrl) {
     const data = await fetchPage(url);
 
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      console.log("Google API Status:", data.status);
-      break;
+      const message = data.error_message
+        ? `${data.status}: ${data.error_message}`
+        : data.status;
+      console.error("Google API Status:", message);
+      throw new Error(`Google Places API error (${message})`);
     }
 
     allResults = [...allResults, ...(data.results || [])];
@@ -55,6 +58,10 @@ async function fetchWithPagination(baseUrl) {
 // =============================
 exports.fetchNearbyFromGoogle = async (lat, lng, type, radius = 10000) => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("GOOGLE_PLACES_API_KEY is not configured");
+  }
 
   const seenIds = new Set();
   let allPlaces = [];
