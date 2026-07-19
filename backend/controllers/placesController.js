@@ -181,18 +181,20 @@ exports.getRealNearbyPlaces = async (req, res) => {
     const openPlaces = cleanedResults.filter((p) => p.is_open !== false);
     const finalPlaces = openPlaces.length > 0 ? openPlaces : cleanedResults;
 
-    // ===== STEP 4: Generate AI in Parallel =====
+    // ===== STEP 4: Generate AI in Parallel (best-effort; skip DB cache if Mongo down) =====
     await Promise.all(
       finalPlaces.map(async (place) => {
         try {
-          // Check DB cache first
-          const existing = await Place.findOne({ place_id: place.place_id });
-          if (existing?.ai_details?.generated_at) {
-            place.ai_details = existing.ai_details;
-            return;
+          try {
+            const existing = await Place.findOne({ place_id: place.place_id });
+            if (existing?.ai_details?.generated_at) {
+              place.ai_details = existing.ai_details;
+              return;
+            }
+          } catch (dbErr) {
+            console.warn("AI cache lookup skipped:", dbErr.message);
           }
 
-          // Call OpenAI
           const aiData = await generatePlaceDetails(place);
           place.ai_details = aiData
             ? { ...aiData, generated_at: new Date() }
@@ -204,26 +206,30 @@ exports.getRealNearbyPlaces = async (req, res) => {
       }),
     );
 
-    // ===== STEP 5: Save to DB =====
-    await Promise.all(
-      finalPlaces.map((place) =>
-        Place.updateOne(
-          { place_id: place.place_id },
-          {
-            $set: {
-              ...place,
-              location: {
-                type: "Point",
-                coordinates: [place.location.lng, place.location.lat],
+    // ===== STEP 5: Save to DB (best-effort; do not block response if Mongo is down) =====
+    try {
+      await Promise.all(
+        finalPlaces.map((place) =>
+          Place.updateOne(
+            { place_id: place.place_id },
+            {
+              $set: {
+                ...place,
+                location: {
+                  type: "Point",
+                  coordinates: [place.location.lng, place.location.lat],
+                },
+                ai_details: place.ai_details || null,
+                source: "google",
               },
-              ai_details: place.ai_details || null,
-              source: "google",
             },
-          },
-          { upsert: true },
+            { upsert: true },
+          ),
         ),
-      ),
-    );
+      );
+    } catch (dbErr) {
+      console.warn("Place cache save skipped:", dbErr.message);
+    }
 
     // ===== STEP 6: Rank =====
     const rankedResults = rankingService.rankPlaces(
