@@ -1,77 +1,51 @@
-# RoamSmart same-day recovery — status for Pritish
+# RoamSmart full functional beta — status
 
 **Date:** 19 Jul 2026  
-**Owner:** Engineering (recovery sprint)  
-**Demo path:** Home → Explore Homestays → search/listing → detail → booking preview
+**Branch:** `beta/full-app` (pushed to GitHub)  
+**Existing backend:** https://bindaas-backend.onrender.com
 
-## Early update (send before / while demoing)
+## What’s done in code
+- Backend hardened: env validation, Mongo-before-listen, `/api/health` + `/api/ready`, fixed route order, smoke tests, `render.yaml`
+- Google nearby now uses mobile `category`, surfaces Places API denials, Mongo cache is best-effort
+- Mobile: restored **Explore Nearby Places**, robust API client, location/error UX, Expo patch versions aligned, Maps key removed from committed `app.json`
+- Homestays browse/detail still works offline
+- Setup docs: `SETUP_SECRETS.md`, `DEPLOY.md`
 
-I reviewed RoamSmart after the three-month pause. The core Expo/Express travel architecture is recoverable, but the current environment and a few stale routes prevent a dependable restart. Today I’m producing a working vertical slice for homestay discovery—entry point, listings, and detail—using deterministic data so the demo is not blocked by old credentials. I’ll send a walkthrough today, followed by a one-week plan for API-backed listings, authentication, and booking.
+## Blocker (needs you — ~15–30 min)
+Render currently returns **0 Google places** and Mongo queries time out. Update the Render service env and redeploy from `beta/full-app`:
 
-## Completion update (send with evidence)
+| Variable | Status on live service |
+|----------|-------------------------|
+| Health | OK |
+| YouTube | Working |
+| `MONGO_URI` | Broken / timing out |
+| `GOOGLE_PLACES_API_KEY` | Missing or denied (0 results) |
+| `OPENAI_API_KEY` | Unknown until places return |
+| Branch / latest code | Must point to `beta/full-app` and redeploy |
 
-Today I restored a demonstrable RoamSmart flow and added the first homestays vertical slice: **home → listings → details**.
+Follow **`DEPLOY.md`** exactly.
 
-**How to run the demo**
+## iPhone beta (Expo Go) — available now
+Tunnel:
+```
+exp://5ejns5g-anonymous-8081.exp.direct
+```
+1. Install Expo Go  
+2. Open the link  
+3. Homestays works fully  
+4. Nearby Places needs the Render keys above
 
+## Android APK — next after Expo login
 ```bash
 cd mobile
-npm start
+npx eas-cli login
 ```
-
-For a browser demo:
-
+Then we run:
 ```bash
-cd mobile
-npm run web -- --port 8082
+npx eas-cli build -p android --profile preview
 ```
 
-Then open the app (browser, Expo Go, or simulator) and:
-
-1. Landing screen (**Bindaas**)
-2. Tap **Explore Homestays**
-3. Search “Goa” or select a city chip
-4. Browse 6 curated stays (price, capacity, amenities, ratings)
-5. Open any card for full detail
-6. Tap **Check availability** to show the booking-preview modal (explicitly does **not** create a booking)
-
-I deliberately kept booking out of this first slice because the project currently has no production-grade identity or availability locking; presenting that as complete would be unsafe.
-
-**Next milestone (1 week)**
-
-- Dedicated `Homestay` Mongo model + `GET /api/homestays` (not reusing Google `Place`)
-- Search by location / guests / price / amenities
-- Backend contract tests
-- Auth provider decision, then authenticated booking with double-booking protection
-
-**Current blockers / needs**
-
-| Item | Status |
-|------|--------|
-| `MONGO_URI` | Invalid (`memory`) — needs real MongoDB |
-| `mobile/.env` | Missing — Expo vars were under `backend/.env` |
-| Google Places / YouTube keys | Missing |
-| OpenAI / Maps keys in repo | Present — **rotate after demo** |
-| Stale `/plan` route | Type error fixed; ZIP geocoding still unavailable |
-| Automated tests | None |
-
-## Baseline assessment (19 Jul)
-
-- Node `v25.2.1` available
-- Mobile dependencies present; Expo Metro starts on `http://localhost:8081`
-- Web demo verified at `http://localhost:8082`
-- Full TypeScript check passes
-- Lint: 0 errors, 7 pre-existing warnings
-- Browser walkthrough verified: landing → listing → search → detail → booking preview → close
-- All six homestay photos are bundled locally; the demo does not depend on image-network availability
-
-## Files added for this slice
-
-- `mobile/types/homestay.ts`
-- `mobile/data/homestays.ts` (deterministic fixtures)
-- `mobile/components/homestays/HomestayCard.tsx`
-- `mobile/app/homestays/index.tsx`
-- `mobile/app/homestays/[id].tsx`
-- `mobile/app/index.tsx` — primary **Explore Homestays** entry
-- `mobile/assets/homestays/` — six offline-safe listing images
-- Web-safe map adapters so the legacy native map dependency does not block the browser demo
+## Beta limitations
+- Homestay booking is preview-only (no real reservation/payment/auth)
+- iPhone standalone/TestFlight needs paid Apple Developer account
+- Render free tier cold-starts (~30s first request)
