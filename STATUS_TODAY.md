@@ -28,7 +28,7 @@ Follow **`DEPLOY.md`** exactly.
 ## iPhone beta (Expo Go) — available now
 Tunnel:
 ```
-exp://5ejns5g-anonymous-8081.exp.direct
+exp://omju-nq-anonymous-8081.exp.direct
 ```
 1. Install Expo Go  
 2. Open the link  
